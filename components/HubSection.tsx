@@ -23,7 +23,6 @@ import {
   ClipboardEdit,
   X,
   LogOut,
-  ShieldCheck,
   Cloud
 } from 'lucide-react';
 import { MATCHES_SCHEDULE, INITIAL_STANDINGS, RW_LOGOS, MatchItem, RWStanding } from '@/data/pordusData';
@@ -44,8 +43,6 @@ interface HubSectionProps {
   onTabChange?: (tab: HubTab) => void;
   onOpenRules: () => void;
   isAdmin: boolean;
-  isCloudSynced: boolean;
-  onConnectGoogleCloud: () => Promise<{ ok: boolean; error?: string }>;
   adminPanel: 'none' | 'jadwal' | 'hasil';
   onAdminPanelChange: (panel: 'none' | 'jadwal' | 'hasil') => void;
   onRequestAdminLogin: (intent?: 'jadwal' | 'hasil') => void;
@@ -344,8 +341,6 @@ export default function HubSection({
   onTabChange,
   onOpenRules,
   isAdmin,
-  isCloudSynced,
-  onConnectGoogleCloud,
   adminPanel,
   onAdminPanelChange,
   onRequestAdminLogin,
@@ -366,7 +361,6 @@ export default function HubSection({
   const [standings] = useState<RWStanding[]>(INITIAL_STANDINGS);
   const [selectedMatchForResult, setSelectedMatchForResult] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string>('');
-  const [isConnectingCloud, setIsConnectingCloud] = useState<boolean>(false);
 
   const isFormOpen = isAdmin && adminPanel === 'jadwal';
   const isResultFormOpen = isAdmin && adminPanel === 'hasil';
@@ -409,22 +403,6 @@ export default function HubSection({
     });
   }, [customMatches, resultOverrides]);
 
-  const handleConnectCloud = async () => {
-    setIsConnectingCloud(true);
-    try {
-      const res = await onConnectGoogleCloud();
-      if (res.ok) {
-        setSuccessMessage(
-          'Akun Google Panitia terhubung! Semua jadwal & hasil kini tersinkronisasi real-time ke semua device.'
-        );
-      } else if (res.error) {
-        setSuccessMessage(res.error);
-      }
-    } finally {
-      setIsConnectingCloud(false);
-    }
-  };
-
   const handleAddMatch = async (newMatch: MatchItem) => {
     if (!isAdmin) {
       onRequestAdminLogin('jadwal');
@@ -441,7 +419,7 @@ export default function HubSection({
     setSuccessMessage(
       result.syncedToCloud
         ? `${baseText} Tersinkronisasi ke semua device.`
-        : `${baseText} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar tampil di semua device.`
+        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
     );
   };
 
@@ -450,7 +428,10 @@ export default function HubSection({
       onRequestAdminLogin('jadwal');
       return;
     }
-    await removeCustomMatch(matchId);
+    const res = await removeCustomMatch(matchId);
+    if (!res.syncedToCloud) {
+      setSuccessMessage('Gagal menghapus jadwal dari server. Periksa koneksi internet Anda.');
+    }
   };
 
   const handleSaveResult = async (matchId: string, result: MatchResultPayload) => {
@@ -469,7 +450,7 @@ export default function HubSection({
     setSuccessMessage(
       writeRes.syncedToCloud
         ? `${baseText} Tersinkronisasi ke semua device.`
-        : `${baseText} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar tampil di semua device.`
+        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
     );
   };
 
@@ -484,7 +465,7 @@ export default function HubSection({
     setSuccessMessage(
       writeRes.syncedToCloud
         ? 'Skor pertandingan dikembalikan ke kondisi awal di semua device.'
-        : 'Skor pertandingan dikembalikan ke kondisi awal di perangkat ini.'
+        : 'Gagal mereset skor di server — periksa koneksi internet Anda.'
     );
   };
 
@@ -754,37 +735,13 @@ export default function HubSection({
           {/* TAB 1 & TAB 2: JADWAL PERTANDINGAN / HASIL PERTANDINGAN */}
           {(activeTab === 'jadwal' || activeTab === 'hasil') && (
             <div>
-              {/* Admin Mode + Cloud Sync Banner */}
+              {/* Admin Mode + Real-Time Sync Banner */}
               {isAdmin && (
-                <div
-                  className={`mb-5 px-4 py-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                    isCloudSynced
-                      ? 'bg-cyan-500/10 border-cyan-400/25 text-cyan-200'
-                      : 'bg-amber-500/10 border-amber-400/30 text-amber-100'
-                  }`}
-                >
-                  <div className="flex items-start sm:items-center gap-2">
-                    {isCloudSynced ? (
-                      <Cloud className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5 sm:mt-0" />
-                    ) : (
-                      <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0 mt-0.5 sm:mt-0" />
-                    )}
-                    <span>
-                      {isCloudSynced
-                        ? 'Sinkronisasi Real-Time Aktif — setiap input jadwal & hasil langsung berubah di semua device.'
-                        : 'Mode Admin Lokal aktif. Hubungkan Google Panitia agar hasil input berubah di semua device.'}
-                    </span>
-                  </div>
-                  {!isCloudSynced && (
-                    <button
-                      type="button"
-                      onClick={handleConnectCloud}
-                      disabled={isConnectingCloud}
-                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-xs font-bold text-amber-100 transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
-                    >
-                      {isConnectingCloud ? 'Menghubungkan...' : 'Hubungkan Google Panitia'}
-                    </button>
-                  )}
+                <div className="mb-5 px-4 py-3 rounded-2xl border bg-cyan-500/10 border-cyan-400/25 text-cyan-200 flex items-start sm:items-center gap-2 text-xs">
+                  <Cloud className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5 sm:mt-0" />
+                  <span>
+                    Mode Admin Aktif — setiap input jadwal & hasil langsung tersinkronisasi real-time ke semua device.
+                  </span>
                 </div>
               )}
 
@@ -1244,36 +1201,6 @@ export default function HubSection({
                 </div>
               )}
 
-              {/* Kontingen RW Logo Showcase (All 8 RWs) */}
-              <div className="mt-10 pt-8 border-t border-white/10">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-200 uppercase tracking-wider">
-                    Logo Resmi Kontingen RW Peserta PORDUS 2 Wanajaya
-                  </h4>
-                  <span className="text-[11px] text-slate-400">8 Kontingen RW Terdaftar · Desa Wanajaya Cibitung</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {Object.entries(RW_LOGOS).map(([rwKey, info]) => (
-                    <div
-                      key={rwKey}
-                      className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-3.5 hover:bg-white/[0.06] transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-white p-0.5 border border-white/20 shrink-0">
-                        <RwLogoImage
-                          src={info.logo}
-                          alt={`Logo ${rwKey} ${info.name}`}
-                          size={48}
-                          className="w-full h-full object-contain rounded-lg"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-extrabold text-white truncate">{rwKey}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{info.name}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 

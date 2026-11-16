@@ -88,6 +88,9 @@ async function compressImageToDataUrl(file: File): Promise<string> {
   if (compressed.length > 680_000) {
     compressed = drawScaled(720, 0.55);
   }
+  if (compressed.length > 820_000) {
+    compressed = drawScaled(540, 0.42);
+  }
   return compressed;
 }
 

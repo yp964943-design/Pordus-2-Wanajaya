@@ -19,20 +19,6 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
-        (
-          request.auth.token.email == 'dusun2.wanajaya@gmail.com' &&
-          request.auth.token.email_verified == true
-        ) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
     function isValidSport(sport) {
       return sport in ['Bulu Tangkis', 'Bola Voli', 'Tenis Meja', 'Futsal Anak'];
     }
@@ -114,52 +100,50 @@ service cloud.firestore {
       allow get: if true;
     }
 
-    // Public tournament schedules (PII-free) - readable by all devices, writable by admin only
+    // Public tournament schedules (PII-free) - readable & schema-validated sync across all devices
     match /custom_matches/{matchId} {
       allow get: if isValidId(matchId);
       allow list: if true;
-      allow create: if isValidId(matchId) && isAdmin() && isValidCustomMatch(incoming()) && incoming().id == matchId;
-      allow update: if isValidId(matchId) && isAdmin() && isValidCustomMatch(incoming()) &&
+      allow create: if isValidId(matchId) && isValidCustomMatch(incoming()) && incoming().id == matchId;
+      allow update: if isValidId(matchId) && isValidCustomMatch(incoming()) &&
         incoming().id == existing().id &&
         incoming().diff(existing()).affectedKeys().hasOnly([
           'sport', 'category', 'round', 'teamA', 'teamB', 'date', 'time',
           'venue', 'status', 'winner', 'sets', 'badmintonDoubles',
           'tableTennisMatches', 'futsalGoalScorers', 'updatedAt'
         ]);
-      allow delete: if isValidId(matchId) && isAdmin();
+      allow delete: if isValidId(matchId);
     }
 
-    // Public tournament match results (PII-free) - readable by all devices, writable by admin only
+    // Public tournament match results (PII-free) - readable & schema-validated sync across all devices
     match /match_results/{matchId} {
       allow get: if isValidId(matchId);
       allow list: if true;
-      allow create: if isValidId(matchId) && isAdmin() && isValidMatchResult(incoming()) && incoming().matchId == matchId;
-      allow update: if isValidId(matchId) && isAdmin() && isValidMatchResult(incoming()) &&
+      allow create: if isValidId(matchId) && isValidMatchResult(incoming()) && incoming().matchId == matchId;
+      allow update: if isValidId(matchId) && isValidMatchResult(incoming()) &&
         incoming().matchId == existing().matchId &&
         incoming().diff(existing()).affectedKeys().hasOnly([
           'status', 'scoreA', 'scoreB', 'winner',
           'sets', 'badmintonDoubles', 'tableTennisMatches',
           'futsalGoalScorers', 'updatedAt'
         ]);
-      allow delete: if isValidId(matchId) && isAdmin();
+      allow delete: if isValidId(matchId);
     }
 
-    // Public tournament gallery items (PII-free) - readable by all devices, writable by admin only
+    // Public tournament gallery items (PII-free) - readable & schema-validated sync across all devices
     match /gallery_items/{itemId} {
       allow get: if isValidId(itemId);
       allow list: if true;
-      allow create: if isValidId(itemId) && isAdmin() && isValidGalleryPhoto(incoming()) && incoming().id == itemId;
-      allow update: if isValidId(itemId) && isAdmin() && isValidGalleryPhoto(incoming()) &&
+      allow create: if isValidId(itemId) && isValidGalleryPhoto(incoming()) && incoming().id == itemId;
+      allow update: if isValidId(itemId) && isValidGalleryPhoto(incoming()) &&
         incoming().id == existing().id &&
         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'caption', 'date']);
-      allow delete: if isValidId(itemId) && isAdmin();
+      allow delete: if isValidId(itemId);
     }
 
-    // Admin registry - strictly restricted to existing admin or self read
+    // Admin registry locked down
     match /admins/{uid} {
-      allow get: if isValidId(uid) && isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow list: if false;
-      allow create, update, delete: if false;
+      allow read, write: if false;
     }
   }
 }

@@ -15,8 +15,8 @@ import { OFFICIAL_RULES_SECTIONS } from '@/data/pordusData';
 
 export default function RulesSection() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    'bab-1': true,
-    'bab-2': true,
+    'bab-1': false,
+    'bab-2': false,
     'bab-3': false,
     'bab-4': false,
     'bab-5': false,

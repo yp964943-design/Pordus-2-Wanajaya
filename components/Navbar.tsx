@@ -2,13 +2,12 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Menu, X, Lock, LogOut, ShieldCheck, Cloud } from 'lucide-react';
+import { Menu, X, Lock, LogOut, ShieldCheck } from 'lucide-react';
 
 interface NavbarProps {
   onOpenScheduleModal: () => void;
   onOpenRulesModal: () => void;
   isAdmin: boolean;
-  isCloudSynced: boolean;
   onOpenLoginModal: () => void;
   onLogoutAdmin: () => void;
 }
@@ -17,7 +16,6 @@ export default function Navbar({
   onOpenScheduleModal,
   onOpenRulesModal,
   isAdmin,
-  isCloudSynced,
   onOpenLoginModal,
   onLogoutAdmin,
 }: NavbarProps) {
@@ -80,12 +78,8 @@ export default function Navbar({
                 title="Keluar dari mode admin"
                 className="min-h-[44px] px-3.5 py-2.5 text-xs font-semibold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 rounded-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
-                {isCloudSynced ? (
-                  <Cloud className="w-3.5 h-3.5 text-cyan-300" />
-                ) : (
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                )}
-                <span>{isCloudSynced ? 'Admin · Sync' : 'Admin'}</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin</span>
                 <LogOut className="w-3.5 h-3.5 ml-0.5 text-emerald-200" />
               </button>
             ) : (
@@ -109,11 +103,7 @@ export default function Navbar({
                 aria-label="Keluar mode admin"
                 className="sm:hidden min-h-[44px] px-3 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-xs font-semibold text-emerald-200 flex items-center gap-1.5 cursor-pointer"
               >
-                {isCloudSynced ? (
-                  <Cloud className="w-3.5 h-3.5 text-cyan-300" />
-                ) : (
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                )}
+                <ShieldCheck className="w-3.5 h-3.5" />
                 <span>Admin</span>
               </button>
             ) : (
@@ -166,7 +156,7 @@ export default function Navbar({
                 className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/25 transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>{isCloudSynced ? 'Admin · Sync Aktif (Logout)' : 'Admin Aktif · Logout'}</span>
+                <span>Admin Aktif · Logout</span>
               </button>
             ) : (
               <button

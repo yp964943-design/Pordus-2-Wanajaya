@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Lock, LogIn, Eye, EyeOff, AlertCircle, X, ShieldCheck, Cloud } from 'lucide-react';
+import { Lock, LogIn, Eye, EyeOff, AlertCircle, X, ShieldCheck } from 'lucide-react';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (username: string, password: string) => boolean;
-  onLoginWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
   onSuccess?: () => void;
   subtitle?: string;
 }
@@ -16,14 +15,12 @@ export default function AdminLoginModal({
   isOpen,
   onClose,
   onLogin,
-  onLoginWithGoogle,
   onSuccess,
   subtitle = 'Masuk sebagai panitia admin untuk mengelola input jadwal, hasil pertandingan, dan galeri.',
 }: AdminLoginModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -38,22 +35,6 @@ export default function AdminLoginModal({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-
-  const handleGoogleSignIn = async () => {
-    setErrorMessage('');
-    setIsGoogleLoading(true);
-    try {
-      const result = await onLoginWithGoogle();
-      if (!result.ok) {
-        setErrorMessage(result.error || 'Gagal masuk dengan akun Google Panitia.');
-        return;
-      }
-      onClose();
-      onSuccess?.();
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,29 +106,6 @@ export default function AdminLoginModal({
           </div>
         )}
 
-        {/* Google Panitia Sign-In (Primary for Multi-Device Cloud Sync) */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={isGoogleLoading}
-          className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-        >
-          <Cloud className="w-4 h-4 shrink-0" />
-          <span>
-            {isGoogleLoading
-              ? 'Menghubungkan Google Panitia...'
-              : 'Masuk dengan Google (Sync Semua Device)'}
-          </span>
-        </button>
-
-        <div className="relative my-5 flex items-center">
-          <div className="flex-1 border-t border-white/10" />
-          <span className="px-3 text-[11px] font-medium text-slate-400">
-            atau masuk dengan akun panitia
-          </span>
-          <div className="flex-1 border-t border-white/10" />
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="admin-username" className="block text-xs font-semibold text-slate-200 mb-2">
@@ -201,9 +159,9 @@ export default function AdminLoginModal({
             </button>
             <button
               type="submit"
-              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-white/15 hover:bg-white/20 border border-white/20 text-white font-bold text-xs active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <LogIn className="w-4 h-4 text-cyan-300" />
+              <LogIn className="w-4 h-4" />
               <span>Masuk Admin</span>
             </button>
           </div>
@@ -212,7 +170,7 @@ export default function AdminLoginModal({
         <div className="mt-5 pt-4 border-t border-white/10 flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
           <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
           <span>
-            Login dengan Google Panitia (<span className="text-slate-200 font-medium">dusun2.wanajaya@gmail.com</span>) membuat semua jadwal, skor, dan foto langsung berubah di seluruh HP/device warga.
+            Semua jadwal, skor pertandingan, dan foto galeri yang diinput admin otomatis tersinkronisasi dan berubah di seluruh HP/device warga.
           </span>
         </div>
       </div>

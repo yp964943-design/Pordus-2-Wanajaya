@@ -10,7 +10,6 @@ import {
 } from 'firebase/firestore';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  auth,
   buildFirestoreErrorInfo,
   db,
   handleFirestoreError,
@@ -101,15 +100,41 @@ function sanitizeCustomMatchDoc(match: MatchItem) {
     updatedAt: serverTimestamp(),
   };
   if (match.winner) payload.winner = String(match.winner).slice(0, 40);
-  if (match.sets) payload.sets = match.sets.slice(0, 10);
+  if (match.sets) {
+    payload.sets = match.sets.slice(0, 10).map((s) => ({
+      set: Number(s.set) || 1,
+      scoreA: Math.max(0, Number(s.scoreA) || 0),
+      scoreB: Math.max(0, Number(s.scoreB) || 0),
+    }));
+  }
   if (match.badmintonDoubles) {
-    payload.badmintonDoubles = match.badmintonDoubles.slice(0, 5);
+    payload.badmintonDoubles = match.badmintonDoubles.slice(0, 5).map((d) => ({
+      partai: Number(d.partai) || 1,
+      label: String(d.label || ''),
+      pairA: String(d.pairA || ''),
+      pairB: String(d.pairB || ''),
+      scoreA: Math.max(0, Number(d.scoreA) || 0),
+      scoreB: Math.max(0, Number(d.scoreB) || 0),
+    }));
   }
   if (match.tableTennisMatches) {
-    payload.tableTennisMatches = match.tableTennisMatches.slice(0, 10);
+    payload.tableTennisMatches = match.tableTennisMatches.slice(0, 10).map((p) => ({
+      partai: Number(p.partai) || 1,
+      label: String(p.label || ''),
+      playerA: String(p.playerA || ''),
+      playerB: String(p.playerB || ''),
+      scoreA: Math.max(0, Number(p.scoreA) || 0),
+      scoreB: Math.max(0, Number(p.scoreB) || 0),
+    }));
   }
   if (match.futsalGoalScorers) {
-    payload.futsalGoalScorers = match.futsalGoalScorers.slice(0, 50);
+    payload.futsalGoalScorers = match.futsalGoalScorers.slice(0, 50).map((g) => ({
+      id: String(g.id),
+      team: g.team === 'B' ? 'B' : 'A',
+      playerName: String(g.playerName || ''),
+      goals: Math.max(1, Number(g.goals) || 1),
+      minute: String(g.minute || ''),
+    }));
   }
   return payload;
 }
@@ -123,15 +148,41 @@ function sanitizeMatchResultDoc(matchId: string, result: MatchResultPayload) {
     updatedAt: serverTimestamp(),
   };
   if (result.winner) payload.winner = String(result.winner).slice(0, 40);
-  if (result.sets) payload.sets = result.sets.slice(0, 10);
+  if (result.sets) {
+    payload.sets = result.sets.slice(0, 10).map((s) => ({
+      set: Number(s.set) || 1,
+      scoreA: Math.max(0, Number(s.scoreA) || 0),
+      scoreB: Math.max(0, Number(s.scoreB) || 0),
+    }));
+  }
   if (result.badmintonDoubles) {
-    payload.badmintonDoubles = result.badmintonDoubles.slice(0, 5);
+    payload.badmintonDoubles = result.badmintonDoubles.slice(0, 5).map((d) => ({
+      partai: Number(d.partai) || 1,
+      label: String(d.label || ''),
+      pairA: String(d.pairA || ''),
+      pairB: String(d.pairB || ''),
+      scoreA: Math.max(0, Number(d.scoreA) || 0),
+      scoreB: Math.max(0, Number(d.scoreB) || 0),
+    }));
   }
   if (result.tableTennisMatches) {
-    payload.tableTennisMatches = result.tableTennisMatches.slice(0, 10);
+    payload.tableTennisMatches = result.tableTennisMatches.slice(0, 10).map((p) => ({
+      partai: Number(p.partai) || 1,
+      label: String(p.label || ''),
+      playerA: String(p.playerA || ''),
+      playerB: String(p.playerB || ''),
+      scoreA: Math.max(0, Number(p.scoreA) || 0),
+      scoreB: Math.max(0, Number(p.scoreB) || 0),
+    }));
   }
   if (result.futsalGoalScorers) {
-    payload.futsalGoalScorers = result.futsalGoalScorers.slice(0, 50);
+    payload.futsalGoalScorers = result.futsalGoalScorers.slice(0, 50).map((g) => ({
+      id: String(g.id),
+      team: g.team === 'B' ? 'B' : 'A',
+      playerName: String(g.playerName || ''),
+      goals: Math.max(1, Number(g.goals) || 1),
+      minute: String(g.minute || ''),
+    }));
   }
   return payload;
 }
@@ -150,9 +201,7 @@ function sanitizeGalleryDoc(item: GalleryItem, createdAt: number) {
 }
 
 export interface CloudWriteResult {
-  savedLocally: boolean;
   syncedToCloud: boolean;
-  needsGoogleAuth?: boolean;
   errorMessage?: string;
 }
 
@@ -175,6 +224,7 @@ export function useTournamentSync() {
 
   useEffect(() => {
     testFirestoreConnection();
+    void syncLocalChangesToCloud();
 
     const unsubMatches = onSnapshot(
       collection(db, 'custom_matches'),
@@ -293,6 +343,7 @@ export function useGallerySync() {
 
   useEffect(() => {
     testFirestoreConnection();
+    void syncLocalChangesToCloud();
 
     const unsubGallery = onSnapshot(
       collection(db, 'gallery_items'),
@@ -354,36 +405,26 @@ export function useGallerySync() {
 }
 
 export async function saveCustomMatch(match: MatchItem): Promise<CloudWriteResult> {
-  if (!auth.currentUser) {
-    const current = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
-    const savedLocally = writeStorageRaw(
-      PENDING_MATCHES_KEY,
-      PENDING_MATCHES_EVENT,
-      [...current.filter((m) => m.id !== match.id), match]
-    );
-    return { savedLocally, syncedToCloud: false, needsGoogleAuth: true };
-  }
-
   const docPath = `custom_matches/${match.id}`;
   try {
     await setDoc(doc(db, 'custom_matches', match.id), sanitizeCustomMatchDoc(match));
-    return { savedLocally: true, syncedToCloud: true };
-  } catch (error) {
     const current = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
-    const savedLocally = writeStorageRaw(
-      PENDING_MATCHES_KEY,
-      PENDING_MATCHES_EVENT,
-      [...current.filter((m) => m.id !== match.id), match]
-    );
+    if (current.some((m) => m.id === match.id)) {
+      writeStorageRaw(
+        PENDING_MATCHES_KEY,
+        PENDING_MATCHES_EVENT,
+        current.filter((m) => m.id !== match.id)
+      );
+    }
+    return { syncedToCloud: true };
+  } catch (error) {
     try {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     } catch (wrapped) {
       return {
-        savedLocally,
         syncedToCloud: false,
-        needsGoogleAuth: true,
         errorMessage:
-          wrapped instanceof Error ? wrapped.message : 'Gagal sinkronisasi ke cloud.',
+          wrapped instanceof Error ? wrapped.message : 'Gagal menyinkronkan jadwal ke cloud.',
       };
     }
   }
@@ -391,11 +432,13 @@ export async function saveCustomMatch(match: MatchItem): Promise<CloudWriteResul
 
 export async function removeCustomMatch(matchId: string): Promise<CloudWriteResult> {
   const current = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
-  writeStorageRaw(
-    PENDING_MATCHES_KEY,
-    PENDING_MATCHES_EVENT,
-    current.filter((m) => m.id !== matchId)
-  );
+  if (current.some((m) => m.id === matchId)) {
+    writeStorageRaw(
+      PENDING_MATCHES_KEY,
+      PENDING_MATCHES_EVENT,
+      current.filter((m) => m.id !== matchId)
+    );
+  }
   const currentResults = readStorageJson<Record<string, MatchResultPayload>>(
     PENDING_RESULTS_KEY,
     {}
@@ -406,19 +449,19 @@ export async function removeCustomMatch(matchId: string): Promise<CloudWriteResu
     writeStorageRaw(PENDING_RESULTS_KEY, PENDING_RESULTS_EVENT, nextResults);
   }
 
-  if (!auth.currentUser) {
-    return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
-  }
-
   try {
     await deleteDoc(doc(db, 'custom_matches', matchId));
     await deleteDoc(doc(db, 'match_results', matchId)).catch(() => {});
-    return { savedLocally: true, syncedToCloud: true };
+    return { syncedToCloud: true };
   } catch (error) {
     try {
       handleFirestoreError(error, OperationType.DELETE, `custom_matches/${matchId}`);
-    } catch {
-      return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal menghapus jadwal dari cloud.',
+      };
     }
   }
 }
@@ -427,45 +470,30 @@ export async function saveMatchResult(
   matchId: string,
   result: MatchResultPayload
 ): Promise<CloudWriteResult> {
-  if (!auth.currentUser) {
-    const current = readStorageJson<Record<string, MatchResultPayload>>(
-      PENDING_RESULTS_KEY,
-      {}
-    );
-    const savedLocally = writeStorageRaw(
-      PENDING_RESULTS_KEY,
-      PENDING_RESULTS_EVENT,
-      { ...current, [matchId]: result }
-    );
-    return { savedLocally, syncedToCloud: false, needsGoogleAuth: true };
-  }
-
   const docPath = `match_results/${matchId}`;
   try {
     await setDoc(
       doc(db, 'match_results', matchId),
       sanitizeMatchResultDoc(matchId, result)
     );
-    return { savedLocally: true, syncedToCloud: true };
-  } catch (error) {
     const current = readStorageJson<Record<string, MatchResultPayload>>(
       PENDING_RESULTS_KEY,
       {}
     );
-    const savedLocally = writeStorageRaw(
-      PENDING_RESULTS_KEY,
-      PENDING_RESULTS_EVENT,
-      { ...current, [matchId]: result }
-    );
+    if (current[matchId]) {
+      const next = { ...current };
+      delete next[matchId];
+      writeStorageRaw(PENDING_RESULTS_KEY, PENDING_RESULTS_EVENT, next);
+    }
+    return { syncedToCloud: true };
+  } catch (error) {
     try {
       handleFirestoreError(error, OperationType.WRITE, docPath);
     } catch (wrapped) {
       return {
-        savedLocally,
         syncedToCloud: false,
-        needsGoogleAuth: true,
         errorMessage:
-          wrapped instanceof Error ? wrapped.message : 'Gagal sinkronisasi ke cloud.',
+          wrapped instanceof Error ? wrapped.message : 'Gagal menyinkronkan hasil ke cloud.',
       };
     }
   }
@@ -482,35 +510,23 @@ export async function removeMatchResult(matchId: string): Promise<CloudWriteResu
     writeStorageRaw(PENDING_RESULTS_KEY, PENDING_RESULTS_EVENT, next);
   }
 
-  if (!auth.currentUser) {
-    return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
-  }
-
   try {
     await deleteDoc(doc(db, 'match_results', matchId));
-    return { savedLocally: true, syncedToCloud: true };
+    return { syncedToCloud: true };
   } catch (error) {
     try {
       handleFirestoreError(error, OperationType.DELETE, `match_results/${matchId}`);
-    } catch {
-      return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal mereset hasil di cloud.',
+      };
     }
   }
 }
 
 export async function saveGalleryItems(newItems: GalleryItem[]): Promise<CloudWriteResult> {
-  if (!auth.currentUser) {
-    const current = readStorageJson<GalleryItem[]>(PENDING_GALLERY_KEY, []);
-    const existingIds = new Set(newItems.map((i) => i.id));
-    const merged = [...newItems, ...current.filter((c) => !existingIds.has(c.id))];
-    const savedLocally = writeStorageRaw(
-      PENDING_GALLERY_KEY,
-      PENDING_GALLERY_EVENT,
-      merged
-    );
-    return { savedLocally, syncedToCloud: false, needsGoogleAuth: true };
-  }
-
   try {
     const baseTs = Date.now();
     await Promise.all(
@@ -521,50 +537,61 @@ export async function saveGalleryItems(newItems: GalleryItem[]): Promise<CloudWr
         )
       )
     );
-    return { savedLocally: true, syncedToCloud: true };
-  } catch (error) {
     const current = readStorageJson<GalleryItem[]>(PENDING_GALLERY_KEY, []);
-    const existingIds = new Set(newItems.map((i) => i.id));
-    const merged = [...newItems, ...current.filter((c) => !existingIds.has(c.id))];
-    const savedLocally = writeStorageRaw(
-      PENDING_GALLERY_KEY,
-      PENDING_GALLERY_EVENT,
-      merged
-    );
+    if (current.length > 0) {
+      const savedIds = new Set(newItems.map((i) => i.id));
+      writeStorageRaw(
+        PENDING_GALLERY_KEY,
+        PENDING_GALLERY_EVENT,
+        current.filter((item) => !savedIds.has(item.id))
+      );
+    }
+    return { syncedToCloud: true };
+  } catch (error) {
     try {
       handleFirestoreError(error, OperationType.WRITE, 'gallery_items');
-    } catch {
-      return { savedLocally, syncedToCloud: false, needsGoogleAuth: true };
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal mengunggah foto ke cloud.',
+      };
     }
   }
 }
 
 export async function removeGalleryItem(itemId: string): Promise<CloudWriteResult> {
   const current = readStorageJson<GalleryItem[]>(PENDING_GALLERY_KEY, []);
-  writeStorageRaw(
-    PENDING_GALLERY_KEY,
-    PENDING_GALLERY_EVENT,
-    current.filter((item) => item.id !== itemId)
-  );
-
-  if (!auth.currentUser) {
-    return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
+  if (current.some((item) => item.id === itemId)) {
+    writeStorageRaw(
+      PENDING_GALLERY_KEY,
+      PENDING_GALLERY_EVENT,
+      current.filter((item) => item.id !== itemId)
+    );
   }
 
   try {
     await deleteDoc(doc(db, 'gallery_items', itemId));
-    return { savedLocally: true, syncedToCloud: true };
+    return { syncedToCloud: true };
   } catch (error) {
     try {
       handleFirestoreError(error, OperationType.DELETE, `gallery_items/${itemId}`);
-    } catch {
-      return { savedLocally: true, syncedToCloud: false, needsGoogleAuth: true };
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal menghapus foto dari cloud.',
+      };
     }
   }
 }
 
+let pendingSyncInFlight: Promise<void> | null = null;
+
 export async function syncLocalChangesToCloud(): Promise<void> {
-  if (!auth.currentUser) return;
+  if (typeof window === 'undefined') return;
+  if (pendingSyncInFlight) return pendingSyncInFlight;
+
   const localMatches = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
   const localResults = readStorageJson<Record<string, MatchResultPayload>>(
     PENDING_RESULTS_KEY,
@@ -572,25 +599,39 @@ export async function syncLocalChangesToCloud(): Promise<void> {
   );
   const localGallery = readStorageJson<GalleryItem[]>(PENDING_GALLERY_KEY, []);
 
-  try {
-    await Promise.all([
-      ...localMatches.map((m) =>
-        setDoc(doc(db, 'custom_matches', m.id), sanitizeCustomMatchDoc(m))
-      ),
-      ...Object.entries(localResults).map(([matchId, res]) =>
-        setDoc(doc(db, 'match_results', matchId), sanitizeMatchResultDoc(matchId, res))
-      ),
-      ...localGallery.map((item, idx) =>
-        setDoc(
-          doc(db, 'gallery_items', item.id),
-          sanitizeGalleryDoc(item, Date.now() - idx)
-        )
-      ),
-    ]);
-    writeStorageRaw(PENDING_MATCHES_KEY, PENDING_MATCHES_EVENT, []);
-    writeStorageRaw(PENDING_RESULTS_KEY, PENDING_RESULTS_EVENT, {});
-    writeStorageRaw(PENDING_GALLERY_KEY, PENDING_GALLERY_EVENT, []);
-  } catch (err) {
-    console.error('Sync pending changes error:', err);
+  if (
+    localMatches.length === 0 &&
+    Object.keys(localResults).length === 0 &&
+    localGallery.length === 0
+  ) {
+    return;
   }
+
+  pendingSyncInFlight = (async () => {
+    try {
+      await Promise.all([
+        ...localMatches.map((m) =>
+          setDoc(doc(db, 'custom_matches', m.id), sanitizeCustomMatchDoc(m))
+        ),
+        ...Object.entries(localResults).map(([matchId, res]) =>
+          setDoc(doc(db, 'match_results', matchId), sanitizeMatchResultDoc(matchId, res))
+        ),
+        ...localGallery.map((item, idx) =>
+          setDoc(
+            doc(db, 'gallery_items', item.id),
+            sanitizeGalleryDoc(item, Date.now() - idx)
+          )
+        ),
+      ]);
+      writeStorageRaw(PENDING_MATCHES_KEY, PENDING_MATCHES_EVENT, []);
+      writeStorageRaw(PENDING_RESULTS_KEY, PENDING_RESULTS_EVENT, {});
+      writeStorageRaw(PENDING_GALLERY_KEY, PENDING_GALLERY_EVENT, []);
+    } catch (err) {
+      console.error('Sync pending changes error:', err);
+    } finally {
+      pendingSyncInFlight = null;
+    }
+  })();
+
+  return pendingSyncInFlight;
 }

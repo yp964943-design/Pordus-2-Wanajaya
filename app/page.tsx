@@ -20,7 +20,7 @@ export default function HomePage() {
   const [pendingAdminAction, setPendingAdminAction] = useState<'jadwal' | 'hasil' | 'galeri' | null>(null);
   const [adminPanel, setAdminPanel] = useState<'none' | 'jadwal' | 'hasil'>('none');
   const [galleryUploadOpen, setGalleryUploadOpen] = useState(false);
-  const { isAdmin, isCloudSynced, login, loginWithGoogle, logout } = useAdminAuth();
+  const { isAdmin, login, logout } = useAdminAuth();
 
   const scrollToSection = (sectionId: string) => {
     const el = document.getElementById(sectionId);
@@ -77,7 +77,6 @@ export default function HomePage() {
         onOpenScheduleModal={() => scrollToHubTab('jadwal')}
         onOpenRulesModal={scrollToRules}
         isAdmin={isAdmin}
-        isCloudSynced={isCloudSynced}
         onOpenLoginModal={() => handleRequestAdminLogin()}
         onLogoutAdmin={handleLogoutAdmin}
       />
@@ -104,8 +103,6 @@ export default function HomePage() {
           onTabChange={setActiveHubTab}
           onOpenRules={scrollToRules}
           isAdmin={isAdmin}
-          isCloudSynced={isCloudSynced}
-          onConnectGoogleCloud={loginWithGoogle}
           adminPanel={adminPanel}
           onAdminPanelChange={setAdminPanel}
           onRequestAdminLogin={handleRequestAdminLogin}
@@ -118,8 +115,6 @@ export default function HomePage() {
         {/* Section 5: Galeri Dokumentasi */}
         <Gallery
           isAdmin={isAdmin}
-          isCloudSynced={isCloudSynced}
-          onConnectGoogleCloud={loginWithGoogle}
           isUploadOpen={galleryUploadOpen}
           onToggleUpload={setGalleryUploadOpen}
           onRequestAdminLogin={() => handleRequestAdminLogin('galeri')}
@@ -147,7 +142,6 @@ export default function HomePage() {
           setPendingAdminAction(null);
         }}
         onLogin={login}
-        onLoginWithGoogle={loginWithGoogle}
         onSuccess={handleLoginSuccess}
         subtitle={loginModalSubtitle}
       />

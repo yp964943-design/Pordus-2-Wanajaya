@@ -15,7 +15,6 @@ import {
   Pause,
   LayoutGrid,
   GalleryHorizontalEnd,
-  Cloud,
 } from 'lucide-react';
 import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
@@ -27,8 +26,6 @@ import {
 
 interface GalleryProps {
   isAdmin: boolean;
-  isCloudSynced: boolean;
-  onConnectGoogleCloud: () => Promise<{ ok: boolean; error?: string }>;
   isUploadOpen: boolean;
   onToggleUpload: (open: boolean) => void;
   onRequestAdminLogin: () => void;
@@ -36,8 +33,6 @@ interface GalleryProps {
 
 export default function Gallery({
   isAdmin,
-  isCloudSynced,
-  onConnectGoogleCloud,
   isUploadOpen,
   onToggleUpload,
   onRequestAdminLogin,
@@ -49,7 +44,6 @@ export default function Gallery({
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
-  const [isConnectingCloud, setIsConnectingCloud] = useState<boolean>(false);
   const touchStartXRef = useRef<number | null>(null);
 
   const { customItems } = useGallerySync();
@@ -157,29 +151,14 @@ export default function Gallery({
     }
   };
 
-  const handleConnectCloud = async () => {
-    setIsConnectingCloud(true);
-    try {
-      const res = await onConnectGoogleCloud();
-      if (res.ok) {
-        setSuccessMessage(
-          'Akun Google Panitia terhubung! Semua foto galeri kini tersinkronisasi otomatis ke semua device.'
-        );
-      } else if (res.error) {
-        setSuccessMessage(res.error);
-      }
-    } finally {
-      setIsConnectingCloud(false);
-    }
-  };
-
   const handleAddPhotos = async (newItems: GalleryItem[]): Promise<boolean> => {
     if (!isAdmin) {
       onRequestAdminLogin?.();
       return false;
     }
     const result = await saveGalleryItems(newItems);
-    if (!result.savedLocally && !result.syncedToCloud) {
+    if (!result.syncedToCloud) {
+      setSuccessMessage('Gagal mengunggah foto ke server. Periksa koneksi internet Anda dan coba lagi.');
       return false;
     }
     setFilter('Foto Baru');
@@ -191,11 +170,7 @@ export default function Gallery({
       newItems.length > 1
         ? `${newItems.length} foto baru berhasil diunggah ke Galeri Slider.`
         : `Foto "${newItems[0]?.title}" berhasil diunggah ke Galeri Slider.`;
-    setSuccessMessage(
-      result.syncedToCloud
-        ? `${label} Tersinkronisasi ke semua device.`
-        : `${label} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar muncul di semua device.`
-    );
+    setSuccessMessage(`${label} Tersinkronisasi ke semua device.`);
     return true;
   };
 
@@ -307,26 +282,6 @@ export default function Gallery({
             )}
           </div>
         </div>
-
-        {/* Cloud Sync Prompt Banner (Admin logged in locally without Google Auth) */}
-        {isAdmin && !isCloudSynced && (
-          <div className="mb-6 p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start sm:items-center gap-2.5 text-xs text-amber-100">
-              <Cloud className="w-4 h-4 text-amber-300 shrink-0 mt-0.5 sm:mt-0" />
-              <span>
-                Mode lokal aktif. Hubungkan akun Google Panitia agar foto galeri langsung muncul di semua device.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleConnectCloud}
-              disabled={isConnectingCloud}
-              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-xs font-bold text-amber-100 transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
-            >
-              {isConnectingCloud ? 'Menghubungkan...' : 'Hubungkan Google Panitia'}
-            </button>
-          </div>
-        )}
 
         {/* Success Feedback Banner */}
         {successMessage && (
