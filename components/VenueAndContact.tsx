@@ -111,7 +111,7 @@ export default function VenueAndContact() {
                   >
                     <button
                       onClick={() => setOpenFaq(isOpen ? null : index)}
-                      className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-3 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                      className="w-full min-h-[48px] p-4 sm:p-5 text-left flex items-center justify-between gap-3 hover:bg-white/[0.04] transition-colors cursor-pointer"
                     >
                       <span className="text-sm font-bold text-white">
                         {faq.q}

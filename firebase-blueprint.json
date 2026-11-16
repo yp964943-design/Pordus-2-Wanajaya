@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "CustomMatch": {
+      "title": "CustomMatch",
+      "description": "Custom scheduled match added by tournament admin and synced across all devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sport": { "type": "string", "enum": ["Bulu Tangkis", "Bola Voli", "Tenis Meja", "Futsal Anak"] },
+        "category": { "type": "string", "maxLength": 64 },
+        "round": { "type": "string", "maxLength": 64 },
+        "teamA": { "type": "object" },
+        "teamB": { "type": "object" },
+        "date": { "type": "string", "maxLength": 80 },
+        "time": { "type": "string", "maxLength": 40 },
+        "venue": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["Selesai", "Sedang Berlangsung", "Segera"] },
+        "winner": { "type": "string", "maxLength": 40 },
+        "sets": { "type": "array" },
+        "badmintonDoubles": { "type": "array" },
+        "tableTennisMatches": { "type": "array" },
+        "futsalGoalScorers": { "type": "array" },
+        "isCustom": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sport", "category", "round", "teamA", "teamB", "date", "time", "venue", "status"]
+    },
+    "MatchResult": {
+      "title": "MatchResult",
+      "description": "Official match result override keyed by matchId and synced across all devices.",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "status": { "type": "string", "enum": ["Selesai", "Sedang Berlangsung", "Segera"] },
+        "scoreA": { "type": "number" },
+        "scoreB": { "type": "number" },
+        "winner": { "type": "string", "maxLength": 40 },
+        "sets": { "type": "array" },
+        "badmintonDoubles": { "type": "array" },
+        "tableTennisMatches": { "type": "array" },
+        "futsalGoalScorers": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["matchId", "status", "scoreA", "scoreB"]
+    },
+    "GalleryPhoto": {
+      "title": "GalleryPhoto",
+      "description": "Tournament gallery photo uploaded by admin and synced to the slider across all devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 160 },
+        "category": { "type": "string", "enum": ["Bulutangkis", "Bola Voli", "Tenis Meja", "Futsal Anak", "Seremoni"] },
+        "imageUrl": { "type": "string", "maxLength": 900000 },
+        "caption": { "type": "string", "maxLength": 500 },
+        "date": { "type": "string", "maxLength": 80 },
+        "isCustom": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "category", "imageUrl", "caption", "date"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Registered tournament administrator UID entry.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["admin"] }
+      },
+      "required": ["uid", "role"]
+    }
+  },
+  "firestore": {
+    "/custom_matches/{matchId}": {
+      "schema": { "$ref": "#/entities/CustomMatch" },
+      "description": "Stores custom tournament match schedules created by admin."
+    },
+    "/match_results/{matchId}": {
+      "schema": { "$ref": "#/entities/MatchResult" },
+      "description": "Stores official scoreboard and per-set/partai/goal-scorer results keyed by matchId."
+    },
+    "/gallery_items/{itemId}": {
+      "schema": { "$ref": "#/entities/GalleryPhoto" },
+      "description": "Stores uploaded tournament gallery photos displayed in the gallery slider."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Admin role membership documents."
+    }
+  }
+}

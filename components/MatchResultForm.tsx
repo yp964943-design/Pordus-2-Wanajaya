@@ -406,7 +406,7 @@ export default function MatchResultForm({
           type="button"
           onClick={onClose}
           aria-label="Tutup form input hasil"
-          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
@@ -820,7 +820,7 @@ export default function MatchResultForm({
                 <button
                   type="button"
                   onClick={handleAddGoalScorer}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/35 text-xs font-bold text-emerald-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/35 text-xs font-bold text-emerald-200 transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
                   <span>Tambah Pencetak Gol</span>
@@ -933,7 +933,7 @@ export default function MatchResultForm({
                           onClick={() => handleRemoveGoalScorer(scorer.id)}
                           aria-label={`Hapus pencetak gol ${scorer.playerName || idx + 1}`}
                           title="Hapus pencetak gol"
-                          className="p-2 rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+                          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -975,12 +975,12 @@ export default function MatchResultForm({
             </select>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-col-reverse sm:flex-row flex-wrap items-stretch sm:items-center justify-end gap-2.5 sm:gap-3">
             {hasOverride?.(selectedMatch.id) && onResetResult && (
               <button
                 type="button"
                 onClick={() => onResetResult(selectedMatch.id)}
-                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-400/35 text-xs font-semibold text-slate-300 hover:text-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-400/35 text-xs font-semibold text-slate-300 hover:text-rose-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset Skor</span>
@@ -989,13 +989,13 @@ export default function MatchResultForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(52,211,153,0.35)] active:scale-95 transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(52,211,153,0.35)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Simpan Hasil</span>

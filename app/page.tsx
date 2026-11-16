@@ -11,6 +11,7 @@ import Gallery from '@/components/Gallery';
 import VenueAndContact from '@/components/VenueAndContact';
 import Footer from '@/components/Footer';
 import AdminLoginModal from '@/components/AdminLoginModal';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import { useAdminAuth } from '@/lib/adminAuth';
 
 export default function HomePage() {
@@ -19,17 +20,20 @@ export default function HomePage() {
   const [pendingAdminAction, setPendingAdminAction] = useState<'jadwal' | 'hasil' | 'galeri' | null>(null);
   const [adminPanel, setAdminPanel] = useState<'none' | 'jadwal' | 'hasil'>('none');
   const [galleryUploadOpen, setGalleryUploadOpen] = useState(false);
-  const { isAdmin, login, logout } = useAdminAuth();
+  const { isAdmin, isCloudSynced, login, loginWithGoogle, logout } = useAdminAuth();
+
+  const scrollToSection = (sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    el?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const scrollToRules = () => {
-    const el = document.getElementById('peraturan');
-    el?.scrollIntoView({ behavior: 'smooth' });
+    scrollToSection('peraturan');
   };
 
   const scrollToHubTab = (tab: HubTab) => {
     setActiveHubTab(tab);
-    const el = document.getElementById('hub-content-view');
-    el?.scrollIntoView({ behavior: 'smooth' });
+    scrollToSection('hub-content-view');
   };
 
   const handleRequestAdminLogin = (intent?: 'jadwal' | 'hasil' | 'galeri') => {
@@ -46,8 +50,7 @@ export default function HomePage() {
       scrollToHubTab('hasil');
     } else if (pendingAdminAction === 'galeri') {
       setGalleryUploadOpen(true);
-      const el = document.getElementById('galeri');
-      el?.scrollIntoView({ behavior: 'smooth' });
+      scrollToSection('galeri');
     }
     setPendingAdminAction(null);
   };
@@ -68,12 +71,13 @@ export default function HomePage() {
           : 'Masuk sebagai panitia admin untuk mengelola input jadwal, hasil pertandingan, dan galeri.';
 
   return (
-    <div className="relative min-h-screen bg-[#070913] text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="relative min-h-screen bg-[#070913] text-slate-100 flex flex-col pb-20 md:pb-0 selection:bg-cyan-500/30 selection:text-cyan-200">
       {/* Top Navbar */}
       <Navbar 
         onOpenScheduleModal={() => scrollToHubTab('jadwal')}
         onOpenRulesModal={scrollToRules}
         isAdmin={isAdmin}
+        isCloudSynced={isCloudSynced}
         onOpenLoginModal={() => handleRequestAdminLogin()}
         onLogoutAdmin={handleLogoutAdmin}
       />
@@ -100,6 +104,8 @@ export default function HomePage() {
           onTabChange={setActiveHubTab}
           onOpenRules={scrollToRules}
           isAdmin={isAdmin}
+          isCloudSynced={isCloudSynced}
+          onConnectGoogleCloud={loginWithGoogle}
           adminPanel={adminPanel}
           onAdminPanelChange={setAdminPanel}
           onRequestAdminLogin={handleRequestAdminLogin}
@@ -112,6 +118,8 @@ export default function HomePage() {
         {/* Section 5: Galeri Dokumentasi */}
         <Gallery
           isAdmin={isAdmin}
+          isCloudSynced={isCloudSynced}
+          onConnectGoogleCloud={loginWithGoogle}
           isUploadOpen={galleryUploadOpen}
           onToggleUpload={setGalleryUploadOpen}
           onRequestAdminLogin={() => handleRequestAdminLogin('galeri')}
@@ -124,6 +132,13 @@ export default function HomePage() {
       {/* Footer */}
       <Footer />
 
+      {/* Mobile Bottom Thumb-Zone Navigation */}
+      <MobileBottomNav
+        activeHubTab={activeHubTab}
+        onSelectHubTab={scrollToHubTab}
+        onJumpToSection={scrollToSection}
+      />
+
       {/* Admin Login Modal */}
       <AdminLoginModal
         isOpen={loginModalOpen}
@@ -132,6 +147,7 @@ export default function HomePage() {
           setPendingAdminAction(null);
         }}
         onLogin={login}
+        onLoginWithGoogle={loginWithGoogle}
         onSuccess={handleLoginSuccess}
         subtitle={loginModalSubtitle}
       />

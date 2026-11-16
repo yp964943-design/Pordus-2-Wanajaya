@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -15,92 +15,27 @@ import {
   Shield,
   CalendarDays,
   ChevronDown,
+  ChevronUp,
   Award,
   PlusCircle,
   CheckCircle2,
   Trash2,
   ClipboardEdit,
   X,
-  Lock,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Cloud
 } from 'lucide-react';
 import { MATCHES_SCHEDULE, INITIAL_STANDINGS, RW_LOGOS, MatchItem, RWStanding } from '@/data/pordusData';
 import MatchScheduleForm from '@/components/MatchScheduleForm';
 import MatchResultForm, { MatchResultPayload } from '@/components/MatchResultForm';
-
-const CUSTOM_MATCHES_STORAGE_KEY = 'pordus2_custom_matches_v1';
-const CUSTOM_MATCHES_EVENT = 'pordus-custom-matches-updated';
-const MATCH_RESULTS_STORAGE_KEY = 'pordus2_match_results_v1';
-const MATCH_RESULTS_EVENT = 'pordus-match-results-updated';
-
-function subscribeCustomMatches(callback: () => void) {
-  if (typeof window === 'undefined') return () => {};
-  const handler = () => callback();
-  window.addEventListener('storage', handler);
-  window.addEventListener(CUSTOM_MATCHES_EVENT, handler);
-  return () => {
-    window.removeEventListener('storage', handler);
-    window.removeEventListener(CUSTOM_MATCHES_EVENT, handler);
-  };
-}
-
-function getCustomMatchesSnapshot(): string {
-  if (typeof window === 'undefined') return '[]';
-  try {
-    return window.localStorage.getItem(CUSTOM_MATCHES_STORAGE_KEY) || '[]';
-  } catch {
-    return '[]';
-  }
-}
-
-function getCustomMatchesServerSnapshot(): string {
-  return '[]';
-}
-
-function writeCustomMatches(matches: MatchItem[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(CUSTOM_MATCHES_STORAGE_KEY, JSON.stringify(matches));
-    window.dispatchEvent(new Event(CUSTOM_MATCHES_EVENT));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
-function subscribeMatchResults(callback: () => void) {
-  if (typeof window === 'undefined') return () => {};
-  const handler = () => callback();
-  window.addEventListener('storage', handler);
-  window.addEventListener(MATCH_RESULTS_EVENT, handler);
-  return () => {
-    window.removeEventListener('storage', handler);
-    window.removeEventListener(MATCH_RESULTS_EVENT, handler);
-  };
-}
-
-function getMatchResultsSnapshot(): string {
-  if (typeof window === 'undefined') return '{}';
-  try {
-    return window.localStorage.getItem(MATCH_RESULTS_STORAGE_KEY) || '{}';
-  } catch {
-    return '{}';
-  }
-}
-
-function getMatchResultsServerSnapshot(): string {
-  return '{}';
-}
-
-function writeMatchResults(results: Record<string, MatchResultPayload>) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(MATCH_RESULTS_STORAGE_KEY, JSON.stringify(results));
-    window.dispatchEvent(new Event(MATCH_RESULTS_EVENT));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
+import {
+  removeCustomMatch,
+  removeMatchResult,
+  saveCustomMatch,
+  saveMatchResult,
+  useTournamentSync,
+} from '@/lib/tournamentSync';
 
 export type HubTab = 'jadwal' | 'hasil' | 'klasemen' | 'bagan';
 
@@ -109,6 +44,8 @@ interface HubSectionProps {
   onTabChange?: (tab: HubTab) => void;
   onOpenRules: () => void;
   isAdmin: boolean;
+  isCloudSynced: boolean;
+  onConnectGoogleCloud: () => Promise<{ ok: boolean; error?: string }>;
   adminPanel: 'none' | 'jadwal' | 'hasil';
   onAdminPanelChange: (panel: 'none' | 'jadwal' | 'hasil') => void;
   onRequestAdminLogin: (intent?: 'jadwal' | 'hasil') => void;
@@ -301,19 +238,19 @@ function StandingsTable({
   const pointTextClass = accent === 'emerald' ? 'text-emerald-300' : 'text-cyan-300';
   return (
     <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className="w-full text-left text-xs text-slate-300">
+      <table className="w-full min-w-[460px] text-left text-xs text-slate-300">
         <thead className="bg-white/5 text-[11px] uppercase text-slate-400 border-b border-white/10">
           <tr>
-            <th className="px-2.5 py-2.5 text-center font-semibold w-9">#</th>
-            <th className="px-3 py-2.5 font-semibold">Tim RW</th>
-            <th className="px-2 py-2.5 text-center font-semibold">P</th>
-            <th className="px-2 py-2.5 text-center font-semibold">W</th>
-            {showDraw && <th className="px-2 py-2.5 text-center font-semibold">D</th>}
-            <th className="px-2 py-2.5 text-center font-semibold">L</th>
-            <th className="px-2 py-2.5 text-center font-semibold">GA</th>
-            <th className="px-2 py-2.5 text-center font-semibold">GF</th>
-            <th className="px-2 py-2.5 text-center font-semibold">GD</th>
-            <th className={`px-3 py-2.5 text-right font-semibold ${pointTextClass}`}>Poin</th>
+            <th className="px-2 sm:px-2.5 py-2.5 text-center font-semibold w-8 sm:w-9">#</th>
+            <th className="px-2.5 sm:px-3 py-2.5 font-semibold">Tim RW</th>
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">P</th>
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">W</th>
+            {showDraw && <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">D</th>}
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">L</th>
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GA</th>
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GF</th>
+            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GD</th>
+            <th className={`px-2.5 sm:px-3 py-2.5 text-right font-semibold ${pointTextClass}`}>Poin</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5 tabular-nums">
@@ -400,11 +337,15 @@ function RwLogoImage({
   );
 }
 
+const INITIAL_ALL_DATES_LIMIT = 4;
+
 export default function HubSection({
   activeTab: controlledTab,
   onTabChange,
   onOpenRules,
   isAdmin,
+  isCloudSynced,
+  onConnectGoogleCloud,
   adminPanel,
   onAdminPanelChange,
   onRequestAdminLogin,
@@ -421,42 +362,16 @@ export default function HubSection({
   const [klasemenFilter, setKlasemenFilter] = useState<string>('Semua');
   const [dateFilter, setDateFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllMatches, setShowAllMatches] = useState(false);
   const [standings] = useState<RWStanding[]>(INITIAL_STANDINGS);
   const [selectedMatchForResult, setSelectedMatchForResult] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [isConnectingCloud, setIsConnectingCloud] = useState<boolean>(false);
 
   const isFormOpen = isAdmin && adminPanel === 'jadwal';
   const isResultFormOpen = isAdmin && adminPanel === 'hasil';
 
-  const customMatchesJson = useSyncExternalStore(
-    subscribeCustomMatches,
-    getCustomMatchesSnapshot,
-    getCustomMatchesServerSnapshot
-  );
-
-  const matchResultsJson = useSyncExternalStore(
-    subscribeMatchResults,
-    getMatchResultsSnapshot,
-    getMatchResultsServerSnapshot
-  );
-
-  const customMatches = useMemo<MatchItem[]>(() => {
-    try {
-      const parsed = JSON.parse(customMatchesJson);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [customMatchesJson]);
-
-  const resultOverrides = useMemo<Record<string, MatchResultPayload>>(() => {
-    try {
-      const parsed = JSON.parse(matchResultsJson);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-    } catch {
-      return {};
-    }
-  }, [matchResultsJson]);
+  const { customMatches, resultOverrides } = useTournamentSync();
 
   const allMatches = useMemo<MatchItem[]>(() => {
     return [...MATCHES_SCHEDULE, ...customMatches].map((match) => {
@@ -494,69 +409,83 @@ export default function HubSection({
     });
   }, [customMatches, resultOverrides]);
 
-  const handleAddMatch = (newMatch: MatchItem) => {
+  const handleConnectCloud = async () => {
+    setIsConnectingCloud(true);
+    try {
+      const res = await onConnectGoogleCloud();
+      if (res.ok) {
+        setSuccessMessage(
+          'Akun Google Panitia terhubung! Semua jadwal & hasil kini tersinkronisasi real-time ke semua device.'
+        );
+      } else if (res.error) {
+        setSuccessMessage(res.error);
+      }
+    } finally {
+      setIsConnectingCloud(false);
+    }
+  };
+
+  const handleAddMatch = async (newMatch: MatchItem) => {
     if (!isAdmin) {
       onRequestAdminLogin('jadwal');
       return;
     }
-    const nextCustom = [...customMatches, newMatch];
-    writeCustomMatches(nextCustom);
+    const result = await saveCustomMatch(newMatch);
     setSportFilter('Semua');
     setDateFilter('Semua');
     setSearchQuery('');
+    setShowAllMatches(true);
     setActiveTab('jadwal');
     onAdminPanelChange('none');
+    const baseText = `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil ditambahkan.`;
     setSuccessMessage(
-      `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil ditambahkan.`
+      result.syncedToCloud
+        ? `${baseText} Tersinkronisasi ke semua device.`
+        : `${baseText} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar tampil di semua device.`
     );
   };
 
-  const handleDeleteCustomMatch = (matchId: string) => {
+  const handleDeleteCustomMatch = async (matchId: string) => {
     if (!isAdmin) {
       onRequestAdminLogin('jadwal');
       return;
     }
-    const nextCustom = customMatches.filter((m) => m.id !== matchId);
-    writeCustomMatches(nextCustom);
-    if (resultOverrides[matchId]) {
-      const nextResults = { ...resultOverrides };
-      delete nextResults[matchId];
-      writeMatchResults(nextResults);
-    }
+    await removeCustomMatch(matchId);
   };
 
-  const handleSaveResult = (matchId: string, result: MatchResultPayload) => {
+  const handleSaveResult = async (matchId: string, result: MatchResultPayload) => {
     if (!isAdmin) {
       onRequestAdminLogin('hasil');
       return;
     }
-    const nextResults = {
-      ...resultOverrides,
-      [matchId]: result,
-    };
-    writeMatchResults(nextResults);
+    const writeRes = await saveMatchResult(matchId, result);
     const targetMatch = allMatches.find((m) => m.id === matchId);
     setActiveTab('hasil');
     onAdminPanelChange('none');
     setSelectedMatchForResult(undefined);
+    const baseText = targetMatch
+      ? `Hasil ${targetMatch.sport} (${targetMatch.teamA.rw} ${result.scoreA} - ${result.scoreB} ${targetMatch.teamB.rw}) berhasil disimpan.`
+      : 'Hasil pertandingan berhasil disimpan.';
     setSuccessMessage(
-      targetMatch
-        ? `Hasil ${targetMatch.sport} (${targetMatch.teamA.rw} ${result.scoreA} - ${result.scoreB} ${targetMatch.teamB.rw}) berhasil disimpan.`
-        : 'Hasil pertandingan berhasil disimpan.'
+      writeRes.syncedToCloud
+        ? `${baseText} Tersinkronisasi ke semua device.`
+        : `${baseText} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar tampil di semua device.`
     );
   };
 
-  const handleResetResult = (matchId: string) => {
+  const handleResetResult = async (matchId: string) => {
     if (!isAdmin) {
       onRequestAdminLogin('hasil');
       return;
     }
-    const nextResults = { ...resultOverrides };
-    delete nextResults[matchId];
-    writeMatchResults(nextResults);
+    const writeRes = await removeMatchResult(matchId);
     onAdminPanelChange('none');
     setSelectedMatchForResult(undefined);
-    setSuccessMessage('Skor pertandingan dikembalikan ke kondisi awal.');
+    setSuccessMessage(
+      writeRes.syncedToCloud
+        ? 'Skor pertandingan dikembalikan ke kondisi awal di semua device.'
+        : 'Skor pertandingan dikembalikan ke kondisi awal di perangkat ini.'
+    );
   };
 
   const openResultFormForMatch = (matchId?: string) => {
@@ -589,8 +518,20 @@ export default function HubSection({
     return matchesSport && matchesDate && matchesSearch;
   });
 
-  // Group filtered matches by date while preserving order
-  const groupedMatches = filteredMatches.reduce<Record<string, MatchItem[]>>((acc, match) => {
+  const shouldLimitMatches =
+    dateFilter === 'Semua' &&
+    !searchQuery.trim() &&
+    filteredMatches.length > INITIAL_ALL_DATES_LIMIT;
+
+  const visibleMatches =
+    shouldLimitMatches && !showAllMatches
+      ? filteredMatches.slice(0, INITIAL_ALL_DATES_LIMIT)
+      : filteredMatches;
+
+  const remainingMatchesCount = filteredMatches.length - visibleMatches.length;
+
+  // Group visible matches by date while preserving order
+  const groupedMatches = visibleMatches.reduce<Record<string, MatchItem[]>>((acc, match) => {
     if (!acc[match.date]) acc[match.date] = [];
     acc[match.date].push(match);
     return acc;
@@ -614,8 +555,8 @@ export default function HubSection({
           </p>
         </div>
 
-        {/* 3 Iconic Glass Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        {/* 3 Iconic Glass Cards (Compact horizontal tap rows on mobile, tall cards on md+) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 md:gap-6 mb-8 sm:mb-10">
           
           {/* Card 1: Hasil Pertandingan */}
           <div
@@ -624,44 +565,44 @@ export default function HubSection({
               const el = document.getElementById('hub-content-view');
               el?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="group glass-card glass-card-hover rounded-3xl p-6 sm:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-col justify-between text-center items-center"
+            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
           >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-400/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-cyan-500/10">
-              <Award className="w-10 h-10 text-cyan-400" />
+            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-cyan-500/10 shrink-0">
+              <Award className="w-6 h-6 md:w-10 md:h-10 text-cyan-400" />
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-white mb-2">
+            <div className="flex-1 md:flex-initial min-w-0">
+              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
                 Hasil Pertandingan
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300">
+              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
                 Rekapitulasi skor set demi set dan hasil akhir pertandingan antar kontingen RW Dusun II Wanajaya.
               </p>
             </div>
-            <div className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-cyan-400 group-hover:translate-x-1 transition-transform">
-              <span>Lihat Hasil Laga</span>
-              <ChevronRight className="w-4 h-4" />
+            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-cyan-400 group-hover:translate-x-1 transition-transform shrink-0">
+              <span className="hidden md:inline">Lihat Hasil Laga</span>
+              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
             </div>
           </div>
 
           {/* Card 2: Peraturan Pertandingan */}
           <div
             onClick={onOpenRules}
-            className="group glass-card glass-card-hover rounded-3xl p-6 sm:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-col justify-between text-center items-center"
+            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
           >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-400/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/10">
-              <FileCheck2 className="w-10 h-10 text-emerald-400" />
+            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-emerald-500/10 shrink-0">
+              <FileCheck2 className="w-6 h-6 md:w-10 md:h-10 text-emerald-400" />
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-white mb-2">
+            <div className="flex-1 md:flex-initial min-w-0">
+              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
                 Peraturan Pertandingan
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300">
+              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
                 Pedoman teknis, kriteria domisili atlet KTP Dusun II, tata tertib, dan sanksi fair play.
               </p>
             </div>
-            <div className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 group-hover:translate-x-1 transition-transform">
-              <span>Baca Pedoman Teknis</span>
-              <ChevronRight className="w-4 h-4" />
+            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0">
+              <span className="hidden md:inline">Baca Pedoman Teknis</span>
+              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
             </div>
           </div>
 
@@ -672,36 +613,36 @@ export default function HubSection({
               const el = document.getElementById('hub-content-view');
               el?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="group glass-card glass-card-hover rounded-3xl p-6 sm:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-col justify-between text-center items-center"
+            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
           >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-400/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/10">
-              <CalendarRange className="w-10 h-10 text-amber-400" />
+            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-amber-500/10 shrink-0">
+              <CalendarRange className="w-6 h-6 md:w-10 md:h-10 text-amber-400" />
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-white mb-2">
+            <div className="flex-1 md:flex-initial min-w-0">
+              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
                 Jadwal & Hasil Pertandingan
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300">
+              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
                 Agenda lengkap fase grup, bagan knockout, hingga partai final perebutan medali.
               </p>
             </div>
-            <div className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform">
-              <span>Lihat Jadwal & Hasil</span>
-              <ChevronRight className="w-4 h-4" />
+            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform shrink-0">
+              <span className="hidden md:inline">Lihat Jadwal & Hasil</span>
+              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
             </div>
           </div>
 
         </div>
 
         {/* Interactive Hub Content Area with Tabs */}
-        <div id="hub-content-view" className="glass-card rounded-3xl border border-white/15 p-6 sm:p-8">
+        <div id="hub-content-view" className="glass-card rounded-3xl border border-white/15 p-4 sm:p-6 md:p-8">
           
           {/* Segmented Control Filter Tabs */}
-          <div className="flex flex-col xl:flex-row items-center justify-between gap-4 border-b border-white/10 pb-6 mb-8">
-            <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/5 border border-white/10 w-full xl:w-auto overflow-x-auto">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-white/10 pb-5 sm:pb-6 mb-6 sm:mb-8">
+            <div className="grid grid-cols-2 sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/5 border border-white/10 w-full xl:w-auto">
               <button
                 onClick={() => setActiveTab('jadwal')}
-                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`min-h-[44px] px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'jadwal'
                     ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -711,7 +652,7 @@ export default function HubSection({
               </button>
               <button
                 onClick={() => setActiveTab('hasil')}
-                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`min-h-[44px] px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'hasil'
                     ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -721,7 +662,7 @@ export default function HubSection({
               </button>
               <button
                 onClick={() => setActiveTab('klasemen')}
-                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`min-h-[44px] px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'klasemen'
                     ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -731,7 +672,7 @@ export default function HubSection({
               </button>
               <button
                 onClick={() => setActiveTab('bagan')}
-                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`min-h-[44px] px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeTab === 'bagan'
                     ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -741,79 +682,71 @@ export default function HubSection({
               </button>
             </div>
 
-            {/* Search Input & Admin-gated Input Jadwal / Input Hasil Buttons */}
+            {/* Search Input & Admin-only Input Jadwal / Input Hasil Buttons */}
             {(activeTab === 'jadwal' || activeTab === 'hasil') && (
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full xl:w-auto">
-                <div className="relative w-full sm:w-52">
+                <div className={`relative w-full ${isAdmin ? 'sm:w-52' : 'sm:w-64'}`}>
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Cari RW, cabang, atau grup..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 text-xs rounded-xl glass-input text-slate-100 placeholder-slate-400 transition-all"
+                    className="w-full min-h-[44px] pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl glass-input text-slate-100 placeholder-slate-400 transition-all"
                   />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isAdmin) {
-                        onRequestAdminLogin('jadwal');
-                        return;
-                      }
-                      if (activeTab !== 'jadwal') setActiveTab('jadwal');
-                      onAdminPanelChange(isFormOpen ? 'none' : 'jadwal');
-                    }}
-                    className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                      isFormOpen
-                        ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
-                        : isAdmin && activeTab === 'jadwal'
-                          ? 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
-                          : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
-                    }`}
-                  >
-                    {isAdmin ? <PlusCircle className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5 text-cyan-400" />}
-                    <span>{isFormOpen ? 'Tutup Form' : 'Input Jadwal'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isAdmin) {
-                        onRequestAdminLogin('hasil');
-                        return;
-                      }
-                      if (activeTab !== 'hasil') setActiveTab('hasil');
-                      const firstMatchForFilter =
-                        sportFilter !== 'Semua'
-                          ? allMatches.find((m) => m.sport === sportFilter)?.id
-                          : undefined;
-                      setSelectedMatchForResult(firstMatchForFilter);
-                      onAdminPanelChange(isResultFormOpen ? 'none' : 'hasil');
-                    }}
-                    className={`flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
-                      isResultFormOpen
-                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
-                        : isAdmin && activeTab === 'hasil'
-                          ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(52,211,153,0.35)] active:scale-95'
-                          : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
-                    }`}
-                  >
-                    {isAdmin ? <ClipboardEdit className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5 text-emerald-400" />}
-                    <span>{isResultFormOpen ? 'Tutup Form' : 'Input Hasil'}</span>
-                  </button>
-                  {isAdmin && (
+                {isAdmin && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeTab !== 'jadwal') setActiveTab('jadwal');
+                        onAdminPanelChange(isFormOpen ? 'none' : 'jadwal');
+                      }}
+                      className={`flex-1 sm:flex-none min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                        isFormOpen
+                          ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
+                          : activeTab === 'jadwal'
+                            ? 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
+                            : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
+                      }`}
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>{isFormOpen ? 'Tutup Form' : 'Input Jadwal'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeTab !== 'hasil') setActiveTab('hasil');
+                        const firstMatchForFilter =
+                          sportFilter !== 'Semua'
+                            ? allMatches.find((m) => m.sport === sportFilter)?.id
+                            : undefined;
+                        setSelectedMatchForResult(firstMatchForFilter);
+                        onAdminPanelChange(isResultFormOpen ? 'none' : 'hasil');
+                      }}
+                      className={`flex-1 sm:flex-none min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                        isResultFormOpen
+                          ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/40'
+                          : activeTab === 'hasil'
+                            ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(52,211,153,0.35)] active:scale-95'
+                            : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
+                      }`}
+                    >
+                      <ClipboardEdit className="w-4 h-4" />
+                      <span>{isResultFormOpen ? 'Tutup Form' : 'Input Hasil'}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={onLogoutAdmin}
                       title="Keluar dari akun admin"
-                      className="px-3 py-2.5 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/15 hover:border-rose-400/35 text-xs font-semibold text-slate-300 hover:text-rose-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                      className="min-h-[44px] px-3 py-2.5 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/15 hover:border-rose-400/35 text-xs font-semibold text-slate-300 hover:text-rose-200 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Logout</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -821,13 +754,37 @@ export default function HubSection({
           {/* TAB 1 & TAB 2: JADWAL PERTANDINGAN / HASIL PERTANDINGAN */}
           {(activeTab === 'jadwal' || activeTab === 'hasil') && (
             <div>
-              {/* Admin Mode Banner when logged in */}
+              {/* Admin Mode + Cloud Sync Banner */}
               {isAdmin && (
-                <div className="mb-5 px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-400/25 flex flex-wrap items-center justify-between gap-2 text-xs text-cyan-200">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span>Mode Admin aktif — Anda dapat menambah jadwal dan memperbarui hasil pertandingan.</span>
+                <div
+                  className={`mb-5 px-4 py-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                    isCloudSynced
+                      ? 'bg-cyan-500/10 border-cyan-400/25 text-cyan-200'
+                      : 'bg-amber-500/10 border-amber-400/30 text-amber-100'
+                  }`}
+                >
+                  <div className="flex items-start sm:items-center gap-2">
+                    {isCloudSynced ? (
+                      <Cloud className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5 sm:mt-0" />
+                    ) : (
+                      <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0 mt-0.5 sm:mt-0" />
+                    )}
+                    <span>
+                      {isCloudSynced
+                        ? 'Sinkronisasi Real-Time Aktif — setiap input jadwal & hasil langsung berubah di semua device.'
+                        : 'Mode Admin Lokal aktif. Hubungkan Google Panitia agar hasil input berubah di semua device.'}
+                    </span>
                   </div>
+                  {!isCloudSynced && (
+                    <button
+                      type="button"
+                      onClick={handleConnectCloud}
+                      disabled={isConnectingCloud}
+                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-xs font-bold text-amber-100 transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
+                    >
+                      {isConnectingCloud ? 'Menghubungkan...' : 'Hubungkan Google Panitia'}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -844,7 +801,7 @@ export default function HubSection({
                     type="button"
                     onClick={() => setSuccessMessage('')}
                     aria-label="Tutup notifikasi"
-                    className="p-1.5 rounded-lg hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer shrink-0"
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -893,10 +850,10 @@ export default function HubSection({
                 )}
               </AnimatePresence>
 
-              {/* Filters Row: Cabor Buttons + Tanggal Dropdown */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1">
+              {/* Filters Row: Cabor Horizontal Scroll on Mobile + Tanggal Dropdown */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap">
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1 shrink-0">
                     <Filter className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Cabor:</span>
                   </span>
@@ -904,7 +861,7 @@ export default function HubSection({
                     <button
                       key={sport}
                       onClick={() => setSportFilter(sport)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                      className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                         sportFilter === sport
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
                           : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
@@ -925,8 +882,11 @@ export default function HubSection({
                     <select
                       id="date-filter-select"
                       value={dateFilter}
-                      onChange={(e) => setDateFilter(e.target.value)}
-                      className="w-full appearance-none pl-4 pr-10 py-2 text-xs font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                      onChange={(e) => {
+                        setDateFilter(e.target.value);
+                        setShowAllMatches(false);
+                      }}
+                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
                     >
                       <option value="Semua" className="bg-[#0a0f24] text-white">
                         Semua Tanggal
@@ -958,7 +918,7 @@ export default function HubSection({
                   </div>
                   <button
                     onClick={() => setActiveTab('klasemen')}
-                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-emerald-300 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-emerald-300 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Lihat Klasemen
                   </button>
@@ -986,21 +946,21 @@ export default function HubSection({
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                         {matches.map((match) => (
                           <div
                             key={match.id}
-                            className="p-5 sm:p-6 rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/15 transition-all duration-200 flex flex-col justify-between"
+                            className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/15 transition-all duration-200 flex flex-col justify-between"
                           >
-                            <div className="flex items-center justify-between text-xs mb-4 pb-3 border-b border-white/10 gap-2">
-                              <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center justify-between text-xs mb-3.5 sm:mb-4 pb-2.5 sm:pb-3 border-b border-white/10 gap-2">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                 <span className="font-bold text-cyan-300">{match.sport}</span>
                                 <span className="text-slate-500">·</span>
                                 <span className="text-slate-200 font-semibold">{match.category}</span>
                                 <span className="text-slate-500">·</span>
                                 <span className="text-amber-300 font-bold">{match.round}</span>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                                 <span
                                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap shrink-0 ${
                                     match.status === 'Selesai'
@@ -1016,7 +976,7 @@ export default function HubSection({
                                     onClick={() => handleDeleteCustomMatch(match.id)}
                                     aria-label={`Hapus jadwal ${match.teamA.rw} vs ${match.teamB.rw}`}
                                     title="Hapus jadwal tambahan"
-                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                    className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -1025,11 +985,11 @@ export default function HubSection({
                             </div>
 
                             {/* Teams with RW Logos and Score / VS */}
-                            <div className="flex items-stretch justify-between gap-3 sm:gap-4 my-2">
+                            <div className="flex items-stretch justify-between gap-2 sm:gap-4 my-1.5 sm:my-2">
                               {/* Team A */}
-                              <div className={`flex-1 text-center p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamA.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
+                              <div className={`flex-1 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamA.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
                                 {match.teamA.logo ? (
-                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-3 flex items-center justify-center">
+                                  <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-2 sm:mb-3 flex items-center justify-center">
                                     <RwLogoImage
                                       src={match.teamA.logo}
                                       alt={`Logo ${match.teamA.rw}`}
@@ -1037,11 +997,11 @@ export default function HubSection({
                                     />
                                   </div>
                                 ) : (
-                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/5 border border-white/15 mb-3 flex items-center justify-center">
-                                    <Shield className="w-8 h-8 text-cyan-400" />
+                                  <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-white/5 border border-white/15 mb-2 sm:mb-3 flex items-center justify-center">
+                                    <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
                                   </div>
                                 )}
-                                <p className="text-lg sm:text-xl font-black text-white tracking-tight">{match.teamA.rw}</p>
+                                <p className="text-base sm:text-xl font-black text-white tracking-tight">{match.teamA.rw}</p>
                                 <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1">
                                   {match.teamA.name || 'Dusun II Wanajaya'}
                                 </p>
@@ -1051,37 +1011,37 @@ export default function HubSection({
                               <div className="px-1 sm:px-2 flex flex-col items-center justify-center shrink-0">
                                 {match.status === 'Selesai' || match.status === 'Sedang Berlangsung' ? (
                                   <div className="text-center">
-                                    <div className="text-xl sm:text-2xl font-black text-white tabular-nums tracking-wider">
+                                    <div className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-wider">
                                       <span className={match.winner === match.teamA.rw ? 'text-amber-400' : ''}>
                                         {match.teamA.score ?? 0}
                                       </span>
-                                      <span className="mx-1.5 text-slate-500">-</span>
+                                      <span className="mx-1 sm:mx-1.5 text-slate-500">-</span>
                                       <span className={match.winner === match.teamB.rw ? 'text-amber-400' : ''}>
                                         {match.teamB.score ?? 0}
                                       </span>
                                     </div>
                                     {match.status === 'Sedang Berlangsung' && (
-                                      <span className="text-[10px] text-cyan-300 block mt-0.5">Skor Berlangsung</span>
+                                      <span className="text-[10px] text-cyan-300 block mt-0.5">Berlangsung</span>
                                     )}
                                   </div>
                                 ) : activeTab === 'hasil' ? (
                                   <div className="text-center">
-                                    <div className="text-lg sm:text-xl font-black text-slate-300 tabular-nums tracking-wider">
+                                    <div className="text-base sm:text-xl font-black text-slate-300 tabular-nums tracking-wider">
                                       0 <span className="text-slate-500">-</span> 0
                                     </div>
-                                    <span className="text-[10px] text-slate-400 block mt-0.5">Skor Sementara</span>
+                                    <span className="text-[10px] text-slate-400 block mt-0.5">Sementara</span>
                                   </div>
                                 ) : (
-                                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-400/30 flex items-center justify-center text-xs sm:text-sm font-black text-cyan-300 tracking-wider uppercase shadow-inner">
+                                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-400/30 flex items-center justify-center text-xs sm:text-sm font-black text-cyan-300 tracking-wider uppercase shadow-inner">
                                     VS
                                   </div>
                                 )}
                               </div>
 
                               {/* Team B */}
-                              <div className={`flex-1 text-center p-3.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamB.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
+                              <div className={`flex-1 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamB.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
                                 {match.teamB.logo ? (
-                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-3 flex items-center justify-center">
+                                  <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-2 sm:mb-3 flex items-center justify-center">
                                     <RwLogoImage
                                       src={match.teamB.logo}
                                       alt={`Logo ${match.teamB.rw}`}
@@ -1089,11 +1049,11 @@ export default function HubSection({
                                     />
                                   </div>
                                 ) : (
-                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/5 border border-white/15 mb-3 flex items-center justify-center">
-                                    <Shield className="w-8 h-8 text-emerald-400" />
+                                  <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-white/5 border border-white/15 mb-2 sm:mb-3 flex items-center justify-center">
+                                    <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
                                   </div>
                                 )}
-                                <p className="text-lg sm:text-xl font-black text-white tracking-tight">{match.teamB.rw}</p>
+                                <p className="text-base sm:text-xl font-black text-white tracking-tight">{match.teamB.rw}</p>
                                 <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1">
                                   {match.teamB.name || 'Dusun II Wanajaya'}
                                 </p>
@@ -1242,9 +1202,9 @@ export default function HubSection({
                                 <button
                                   type="button"
                                   onClick={() => openResultFormForMatch(match.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-[11px] font-semibold text-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                                  className="min-h-[40px] px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-xs font-semibold text-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                                 >
-                                  <ClipboardEdit className="w-3 h-3" />
+                                  <ClipboardEdit className="w-3.5 h-3.5" />
                                   <span>{match.status === 'Segera' ? 'Input Skor' : 'Edit Skor'}</span>
                                 </button>
                               )}
@@ -1254,6 +1214,33 @@ export default function HubSection({
                       </div>
                     </div>
                   ))}
+
+                  {shouldLimitMatches && (
+                    <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <p className="text-xs text-slate-400 text-center sm:text-left">
+                        Menampilkan{' '}
+                        <span className="font-semibold text-slate-200">{visibleMatches.length}</span> dari{' '}
+                        <span className="font-semibold text-slate-200">{filteredMatches.length}</span> pertandingan (Semua Tanggal)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllMatches((prev) => !prev)}
+                        className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-white/10 hover:bg-cyan-500/20 border border-white/15 hover:border-cyan-400/40 text-xs sm:text-sm font-bold text-cyan-300 hover:text-cyan-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {showAllMatches ? (
+                          <>
+                            <span>Tampilkan Lebih Ringkas</span>
+                            <ChevronUp className="w-4 h-4" />
+                          </>
+                        ) : (
+                          <>
+                            <span>Selengkapnya ({remainingMatchesCount} Pertandingan Lainnya)</span>
+                            <ChevronDown className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1344,13 +1331,13 @@ export default function HubSection({
                         Klasemen otomatis diperbarui saat hasil pertandingan diinput (Menang 3 poin, Seri 1 poin, Kalah 0 poin).
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap">
                       {klasemenFilterOptions.map((opt) => (
                         <button
                           key={opt}
                           type="button"
                           onClick={() => setKlasemenFilter(opt)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                          className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                             klasemenFilter === opt
                               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
                               : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
@@ -1499,15 +1486,15 @@ export default function HubSection({
 
                   {/* Table Container */}
                   <div className="overflow-x-auto rounded-2xl border border-white/10">
-                    <table className="w-full text-left text-sm text-slate-300">
+                    <table className="w-full min-w-[540px] text-left text-sm text-slate-300">
                       <thead className="text-xs uppercase bg-white/5 text-slate-300 border-b border-white/10">
                         <tr>
-                          <th className="px-4 py-3.5 text-center font-bold">Peringkat</th>
-                          <th className="px-5 py-3.5 font-bold">Kontingen RW</th>
-                          <th className="px-4 py-3.5 text-center font-bold text-amber-300">🥇 Emas</th>
-                          <th className="px-4 py-3.5 text-center font-bold text-slate-300">🥈 Perak</th>
-                          <th className="px-4 py-3.5 text-center font-bold text-amber-600">🥉 Perunggu</th>
-                          <th className="px-5 py-3.5 text-right font-bold text-cyan-400">Total Poin</th>
+                          <th className="px-3 sm:px-4 py-3.5 text-center font-bold">Peringkat</th>
+                          <th className="px-3 sm:px-5 py-3.5 font-bold">Kontingen RW</th>
+                          <th className="px-3 sm:px-4 py-3.5 text-center font-bold text-amber-300">🥇 Emas</th>
+                          <th className="px-3 sm:px-4 py-3.5 text-center font-bold text-slate-300">🥈 Perak</th>
+                          <th className="px-3 sm:px-4 py-3.5 text-center font-bold text-amber-600">🥉 Perunggu</th>
+                          <th className="px-3 sm:px-5 py-3.5 text-right font-bold text-cyan-400">Total Poin</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 text-xs sm:text-sm">

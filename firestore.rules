@@ -1,0 +1,165 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (
+          request.auth.token.email == 'dusun2.wanajaya@gmail.com' &&
+          request.auth.token.email_verified == true
+        ) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidSport(sport) {
+      return sport in ['Bulu Tangkis', 'Bola Voli', 'Tenis Meja', 'Futsal Anak'];
+    }
+
+    function isValidStatus(status) {
+      return status in ['Selesai', 'Sedang Berlangsung', 'Segera'];
+    }
+
+    function isValidTeam(team) {
+      return team is map &&
+        team.keys().hasAll(['rw']) &&
+        team.keys().hasOnly(['rw', 'name', 'logo', 'score']) &&
+        team.rw is string && team.rw.size() >= 1 && team.rw.size() <= 40 &&
+        (!('name' in team) || (team.name is string && team.name.size() <= 100)) &&
+        (!('logo' in team) || (team.logo is string && team.logo.size() <= 300)) &&
+        (!('score' in team) || (team.score is number && team.score >= 0 && team.score <= 999));
+    }
+
+    function isValidCustomMatch(data) {
+      return data.keys().hasAll(['id', 'sport', 'category', 'round', 'teamA', 'teamB', 'date', 'time', 'venue', 'status']) &&
+        data.keys().hasOnly([
+          'id', 'sport', 'category', 'round', 'teamA', 'teamB', 'date', 'time',
+          'venue', 'status', 'winner', 'sets', 'badmintonDoubles',
+          'tableTennisMatches', 'futsalGoalScorers', 'isCustom', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidSport(data.sport) &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 64 &&
+        data.round is string && data.round.size() >= 1 && data.round.size() <= 64 &&
+        isValidTeam(data.teamA) &&
+        isValidTeam(data.teamB) &&
+        data.date is string && data.date.size() >= 1 && data.date.size() <= 80 &&
+        data.time is string && data.time.size() >= 1 && data.time.size() <= 40 &&
+        data.venue is string && data.venue.size() >= 1 && data.venue.size() <= 120 &&
+        isValidStatus(data.status) &&
+        (!('winner' in data) || (data.winner is string && data.winner.size() <= 40)) &&
+        (!('sets' in data) || (data.sets is list && data.sets.size() <= 10)) &&
+        (!('badmintonDoubles' in data) || (data.badmintonDoubles is list && data.badmintonDoubles.size() <= 5)) &&
+        (!('tableTennisMatches' in data) || (data.tableTennisMatches is list && data.tableTennisMatches.size() <= 10)) &&
+        (!('futsalGoalScorers' in data) || (data.futsalGoalScorers is list && data.futsalGoalScorers.size() <= 50)) &&
+        (!('isCustom' in data) || data.isCustom is bool) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidMatchResult(data) {
+      return data.keys().hasAll(['matchId', 'status', 'scoreA', 'scoreB']) &&
+        data.keys().hasOnly([
+          'matchId', 'status', 'scoreA', 'scoreB', 'winner',
+          'sets', 'badmintonDoubles', 'tableTennisMatches',
+          'futsalGoalScorers', 'updatedAt'
+        ]) &&
+        isValidId(data.matchId) &&
+        isValidStatus(data.status) &&
+        data.scoreA is number && data.scoreA >= 0 && data.scoreA <= 999 &&
+        data.scoreB is number && data.scoreB >= 0 && data.scoreB <= 999 &&
+        (!('winner' in data) || (data.winner is string && data.winner.size() <= 40)) &&
+        (!('sets' in data) || (data.sets is list && data.sets.size() <= 10)) &&
+        (!('badmintonDoubles' in data) || (data.badmintonDoubles is list && data.badmintonDoubles.size() <= 5)) &&
+        (!('tableTennisMatches' in data) || (data.tableTennisMatches is list && data.tableTennisMatches.size() <= 10)) &&
+        (!('futsalGoalScorers' in data) || (data.futsalGoalScorers is list && data.futsalGoalScorers.size() <= 50)) &&
+        (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidGalleryPhoto(data) {
+      return data.keys().hasAll(['id', 'title', 'category', 'imageUrl', 'caption', 'date']) &&
+        data.keys().hasOnly(['id', 'title', 'category', 'imageUrl', 'caption', 'date', 'isCustom', 'createdAt']) &&
+        isValidId(data.id) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+        data.category in ['Bulutangkis', 'Bola Voli', 'Tenis Meja', 'Futsal Anak', 'Seremoni'] &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 900000 &&
+        data.caption is string && data.caption.size() <= 500 &&
+        data.date is string && data.date.size() >= 1 && data.date.size() <= 80 &&
+        (!('isCustom' in data) || data.isCustom is bool) &&
+        (!('createdAt' in data) || data.createdAt is number);
+    }
+
+    // Connection health check path (read-only)
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Public tournament schedules (PII-free) - readable by all devices, writable by admin only
+    match /custom_matches/{matchId} {
+      allow get: if isValidId(matchId);
+      allow list: if true;
+      allow create: if isValidId(matchId) && isAdmin() && isValidCustomMatch(incoming()) && incoming().id == matchId;
+      allow update: if isValidId(matchId) && isAdmin() && isValidCustomMatch(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'sport', 'category', 'round', 'teamA', 'teamB', 'date', 'time',
+          'venue', 'status', 'winner', 'sets', 'badmintonDoubles',
+          'tableTennisMatches', 'futsalGoalScorers', 'updatedAt'
+        ]);
+      allow delete: if isValidId(matchId) && isAdmin();
+    }
+
+    // Public tournament match results (PII-free) - readable by all devices, writable by admin only
+    match /match_results/{matchId} {
+      allow get: if isValidId(matchId);
+      allow list: if true;
+      allow create: if isValidId(matchId) && isAdmin() && isValidMatchResult(incoming()) && incoming().matchId == matchId;
+      allow update: if isValidId(matchId) && isAdmin() && isValidMatchResult(incoming()) &&
+        incoming().matchId == existing().matchId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'scoreA', 'scoreB', 'winner',
+          'sets', 'badmintonDoubles', 'tableTennisMatches',
+          'futsalGoalScorers', 'updatedAt'
+        ]);
+      allow delete: if isValidId(matchId) && isAdmin();
+    }
+
+    // Public tournament gallery items (PII-free) - readable by all devices, writable by admin only
+    match /gallery_items/{itemId} {
+      allow get: if isValidId(itemId);
+      allow list: if true;
+      allow create: if isValidId(itemId) && isAdmin() && isValidGalleryPhoto(incoming()) && incoming().id == itemId;
+      allow update: if isValidId(itemId) && isAdmin() && isValidGalleryPhoto(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'caption', 'date']);
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    // Admin registry - strictly restricted to existing admin or self read
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+  }
+}

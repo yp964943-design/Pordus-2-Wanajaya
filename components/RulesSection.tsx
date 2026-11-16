@@ -78,7 +78,7 @@ export default function RulesSection() {
           <a
             href="/assets/aistudio/Peraturan_dan_petunjuk_teknis_PORDUS_II_Wanajaya_dda23dce.pdf"
             download="Panduan_Teknis_dan_Peraturan_PORDUS_II_Wanajaya.pdf"
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 text-xs font-bold shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0"
+            className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 text-xs font-bold shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shrink-0"
           >
             <Download className="w-4 h-4" />
             <span>Unduh Juknis Lengkap (PDF)</span>
@@ -132,7 +132,7 @@ export default function RulesSection() {
           <button
             type="button"
             onClick={toggleAll}
-            className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition-colors cursor-pointer"
+            className="min-h-[44px] px-2 text-xs font-semibold text-cyan-300 hover:text-cyan-200 transition-colors cursor-pointer"
           >
             {allExpanded ? 'Tutup Semua Bab' : 'Buka Semua Bab'}
           </button>

@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Maximize2,
   X,
   Upload,
-  Lock,
   Trash2,
   CheckCircle2,
   ChevronLeft,
@@ -16,50 +15,20 @@ import {
   Pause,
   LayoutGrid,
   GalleryHorizontalEnd,
+  Cloud,
 } from 'lucide-react';
 import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
-
-const CUSTOM_GALLERY_STORAGE_KEY = 'pordus2_custom_gallery_v1';
-const CUSTOM_GALLERY_EVENT = 'pordus-custom-gallery-updated';
-
-function subscribeCustomGallery(callback: () => void) {
-  if (typeof window === 'undefined') return () => {};
-  const handler = () => callback();
-  window.addEventListener('storage', handler);
-  window.addEventListener(CUSTOM_GALLERY_EVENT, handler);
-  return () => {
-    window.removeEventListener('storage', handler);
-    window.removeEventListener(CUSTOM_GALLERY_EVENT, handler);
-  };
-}
-
-function getCustomGallerySnapshot(): string {
-  if (typeof window === 'undefined') return '[]';
-  try {
-    return window.localStorage.getItem(CUSTOM_GALLERY_STORAGE_KEY) || '[]';
-  } catch {
-    return '[]';
-  }
-}
-
-function getCustomGalleryServerSnapshot(): string {
-  return '[]';
-}
-
-function writeCustomGallery(items: GalleryItem[]): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    window.localStorage.setItem(CUSTOM_GALLERY_STORAGE_KEY, JSON.stringify(items));
-    window.dispatchEvent(new Event(CUSTOM_GALLERY_EVENT));
-    return true;
-  } catch {
-    return false;
-  }
-}
+import {
+  removeGalleryItem,
+  saveGalleryItems,
+  useGallerySync,
+} from '@/lib/tournamentSync';
 
 interface GalleryProps {
   isAdmin: boolean;
+  isCloudSynced: boolean;
+  onConnectGoogleCloud: () => Promise<{ ok: boolean; error?: string }>;
   isUploadOpen: boolean;
   onToggleUpload: (open: boolean) => void;
   onRequestAdminLogin: () => void;
@@ -67,6 +36,8 @@ interface GalleryProps {
 
 export default function Gallery({
   isAdmin,
+  isCloudSynced,
+  onConnectGoogleCloud,
   isUploadOpen,
   onToggleUpload,
   onRequestAdminLogin,
@@ -78,21 +49,10 @@ export default function Gallery({
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [isConnectingCloud, setIsConnectingCloud] = useState<boolean>(false);
+  const touchStartXRef = useRef<number | null>(null);
 
-  const customGalleryJson = useSyncExternalStore(
-    subscribeCustomGallery,
-    getCustomGallerySnapshot,
-    getCustomGalleryServerSnapshot
-  );
-
-  const customItems = useMemo<GalleryItem[]>(() => {
-    try {
-      const parsed = JSON.parse(customGalleryJson);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, [customGalleryJson]);
+  const { customItems } = useGallerySync();
 
   const allItems = useMemo<GalleryItem[]>(() => {
     return [...customItems, ...GALLERY_ITEMS];
@@ -172,14 +132,54 @@ export default function Gallery({
     setSlideIndex(0);
   };
 
-  const handleAddPhotos = (newItems: GalleryItem[]): boolean => {
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
+  };
+
+  const handleTouchEnd = (
+    e: React.TouchEvent,
+    onSwipeLeft: () => void,
+    onSwipeRight: () => void
+  ) => {
+    if (touchStartXRef.current === null) return;
+    const endX = e.changedTouches[0]?.clientX;
+    if (typeof endX !== 'number') {
+      touchStartXRef.current = null;
+      return;
+    }
+    const delta = endX - touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (Math.abs(delta) < 45) return;
+    if (delta < 0) {
+      onSwipeLeft();
+    } else {
+      onSwipeRight();
+    }
+  };
+
+  const handleConnectCloud = async () => {
+    setIsConnectingCloud(true);
+    try {
+      const res = await onConnectGoogleCloud();
+      if (res.ok) {
+        setSuccessMessage(
+          'Akun Google Panitia terhubung! Semua foto galeri kini tersinkronisasi otomatis ke semua device.'
+        );
+      } else if (res.error) {
+        setSuccessMessage(res.error);
+      }
+    } finally {
+      setIsConnectingCloud(false);
+    }
+  };
+
+  const handleAddPhotos = async (newItems: GalleryItem[]): Promise<boolean> => {
     if (!isAdmin) {
-      onRequestAdminLogin();
+      onRequestAdminLogin?.();
       return false;
     }
-    const nextItems = [...newItems, ...customItems];
-    const ok = writeCustomGallery(nextItems);
-    if (!ok) {
+    const result = await saveGalleryItems(newItems);
+    if (!result.savedLocally && !result.syncedToCloud) {
       return false;
     }
     setFilter('Foto Baru');
@@ -187,25 +187,29 @@ export default function Gallery({
     setSlideDirection(1);
     setSlideIndex(0);
     onToggleUpload(false);
-    setSuccessMessage(
+    const label =
       newItems.length > 1
         ? `${newItems.length} foto baru berhasil diunggah ke Galeri Slider.`
-        : `Foto "${newItems[0]?.title}" berhasil diunggah ke Galeri Slider.`
+        : `Foto "${newItems[0]?.title}" berhasil diunggah ke Galeri Slider.`;
+    setSuccessMessage(
+      result.syncedToCloud
+        ? `${label} Tersinkronisasi ke semua device.`
+        : `${label} Tersimpan di perangkat ini — hubungkan akun Google Panitia agar muncul di semua device.`
     );
     return true;
   };
 
-  const handleDeleteCustomPhoto = (id: string) => {
+  const handleDeleteCustomPhoto = async (id: string) => {
     if (!isAdmin) {
       onRequestAdminLogin();
       return;
     }
-    const nextItems = customItems.filter((item) => item.id !== id);
-    writeCustomGallery(nextItems);
+    const remainingCount = customItems.filter((item) => item.id !== id).length;
+    await removeGalleryItem(id);
     if (activePhotoId === id) {
       setActivePhotoId(null);
     }
-    if (filter === 'Foto Baru' && nextItems.length === 0) {
+    if (filter === 'Foto Baru' && remainingCount === 0) {
       setFilter('Semua');
     }
     setSlideIndex(0);
@@ -240,14 +244,14 @@ export default function Gallery({
         </div>
 
         {/* Category Filters + View Switcher + Upload Galeri CTA */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-8">
-          <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap w-full lg:w-auto">
             {filterCategories.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => handleFilterChange(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   filter === cat
                     ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-bold shadow-md'
                     : 'glass-card text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
@@ -258,13 +262,13 @@ export default function Gallery({
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2.5 shrink-0">
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full lg:w-auto">
             {/* View Mode Toggle: Slider / Grid */}
             <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
               <button
                 type="button"
                 onClick={() => setViewMode('slider')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   viewMode === 'slider'
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
                     : 'text-slate-400 hover:text-white'
@@ -276,7 +280,7 @@ export default function Gallery({
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                   viewMode === 'grid'
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
                     : 'text-slate-400 hover:text-white'
@@ -287,32 +291,42 @@ export default function Gallery({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (!isAdmin) {
-                  onRequestAdminLogin();
-                  return;
-                }
-                onToggleUpload(!isUploadOpen);
-              }}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                isAdmin && isUploadOpen
-                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
-                  : isAdmin
-                    ? 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
-                    : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
-              }`}
-            >
-              {isAdmin ? (
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => onToggleUpload(!isUploadOpen)}
+                className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
+                  isUploadOpen
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
+                    : 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
+                }`}
+              >
                 <Upload className="w-4 h-4" />
-              ) : (
-                <Lock className="w-3.5 h-3.5 text-cyan-400" />
-              )}
-              <span>{isAdmin && isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
-            </button>
+                <span>{isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Cloud Sync Prompt Banner (Admin logged in locally without Google Auth) */}
+        {isAdmin && !isCloudSynced && (
+          <div className="mb-6 p-3.5 sm:p-4 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-2.5 text-xs text-amber-100">
+              <Cloud className="w-4 h-4 text-amber-300 shrink-0 mt-0.5 sm:mt-0" />
+              <span>
+                Mode lokal aktif. Hubungkan akun Google Panitia agar foto galeri langsung muncul di semua device.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectCloud}
+              disabled={isConnectingCloud}
+              className="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-xs font-bold text-amber-100 transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
+            >
+              {isConnectingCloud ? 'Menghubungkan...' : 'Hubungkan Google Panitia'}
+            </button>
+          </div>
+        )}
 
         {/* Success Feedback Banner */}
         {successMessage && (
@@ -327,7 +341,7 @@ export default function Gallery({
               type="button"
               onClick={() => setSuccessMessage('')}
               aria-label="Tutup notifikasi"
-              className="p-1.5 rounded-lg hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer shrink-0"
+              className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -359,9 +373,13 @@ export default function Gallery({
         ) : viewMode === 'slider' && activeSlideItem ? (
           /* SLIDER VIEW */
           <div className="space-y-5">
-            {/* Main Stage Slider */}
-            <div className="relative glass-card rounded-3xl overflow-hidden border border-white/15 bg-black/50">
-              <div className="relative aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/10] w-full overflow-hidden">
+            {/* Main Stage Slider with Mobile Touch Swipe */}
+            <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={(e) => handleTouchEnd(e, goToNextSlide, goToPrevSlide)}
+              className="relative glass-card rounded-3xl overflow-hidden border border-white/15 bg-black/50 touch-pan-y"
+            >
+              <div className="relative aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/10] w-full overflow-hidden">
                 <AnimatePresence mode="wait" custom={slideDirection}>
                   <motion.div
                     key={activeSlideItem.id}
@@ -385,8 +403,8 @@ export default function Gallery({
                 </AnimatePresence>
 
                 {/* Top Control Bar on Slide */}
-                <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between gap-3 pointer-events-none">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-200 bg-black/55 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/15 pointer-events-auto tabular-nums">
+                <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-10 flex items-center justify-between gap-2 sm:gap-3 pointer-events-none">
+                  <div className="min-h-[40px] flex items-center gap-2 text-xs font-semibold text-slate-200 bg-black/55 backdrop-blur-md px-3 sm:px-3.5 py-2 rounded-xl border border-white/15 pointer-events-auto tabular-nums">
                     <span className="text-cyan-300 font-bold">
                       {String(safeIndex + 1).padStart(2, '0')}
                     </span>
@@ -400,7 +418,7 @@ export default function Gallery({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 pointer-events-auto">
+                  <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
                     {itemCount > 1 && (
                       <button
                         type="button"
@@ -410,7 +428,7 @@ export default function Gallery({
                         }}
                         aria-label={isAutoPlaying ? 'Jeda slider otomatis' : 'Putar slider otomatis'}
                         title={isAutoPlaying ? 'Jeda slider' : 'Putar otomatis'}
-                        className="w-10 h-10 rounded-xl bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                        className="w-11 h-11 rounded-xl bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
                       >
                         {isAutoPlaying ? (
                           <Pause className="w-4 h-4 text-cyan-300" />
@@ -425,11 +443,11 @@ export default function Gallery({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteCustomPhoto(activeSlideItem.id);
+                          void handleDeleteCustomPhoto(activeSlideItem.id);
                         }}
                         aria-label={`Hapus foto ${activeSlideItem.title}`}
                         title="Hapus foto unggahan"
-                        className="w-10 h-10 rounded-xl bg-black/55 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                        className="w-11 h-11 rounded-xl bg-black/55 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -443,7 +461,7 @@ export default function Gallery({
                       }}
                       aria-label="Perbesar foto"
                       title="Lihat layar penuh"
-                      className="w-10 h-10 rounded-xl bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                      className="w-11 h-11 rounded-xl bg-black/55 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
                     >
                       <Maximize2 className="w-4 h-4" />
                     </button>
@@ -558,16 +576,16 @@ export default function Gallery({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteCustomPhoto(item.id);
+                        void handleDeleteCustomPhoto(item.id);
                       }}
                       aria-label={`Hapus foto ${item.title}`}
                       title="Hapus foto unggahan"
-                      className="w-9 h-9 rounded-xl bg-black/60 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                      className="w-11 h-11 rounded-xl bg-black/60 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
-                  <div className="w-9 h-9 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <Maximize2 className="w-4 h-4" />
                   </div>
                 </div>
@@ -593,26 +611,44 @@ export default function Gallery({
 
       </div>
 
-      {/* Lightbox Modal with Prev / Next Slider Controls */}
+      {/* Lightbox Modal with Prev / Next Slider Controls & Touch Swipe */}
       {activeLightboxPhoto && (
         <div
           onClick={() => setActivePhotoId(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-4xl glass-card rounded-3xl border border-white/20 p-4 sm:p-6 overflow-hidden"
+            className="relative w-full max-w-4xl glass-card rounded-3xl border border-white/20 p-3 sm:p-6 overflow-hidden"
           >
             <button
               type="button"
               onClick={() => setActivePhotoId(null)}
               aria-label="Tutup tampilan foto"
-              className="absolute top-6 right-6 z-20 p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white transition-colors border border-white/20 cursor-pointer"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/65 hover:bg-black/90 text-white transition-colors border border-white/20 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black">
+            <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={(e) =>
+                handleTouchEnd(
+                  e,
+                  () => {
+                    if (itemCount <= 1) return;
+                    const nextIdx = (lightboxIndex + 1) % itemCount;
+                    setActivePhotoId(filteredItems[nextIdx].id);
+                  },
+                  () => {
+                    if (itemCount <= 1) return;
+                    const prevIdx = (lightboxIndex - 1 + itemCount) % itemCount;
+                    setActivePhotoId(filteredItems[prevIdx].id);
+                  }
+                )
+              }
+              className="relative aspect-[4/3] sm:aspect-video w-full rounded-2xl overflow-hidden bg-black touch-pan-y"
+            >
               <Image
                 src={activeLightboxPhoto.imageUrl}
                 alt={activeLightboxPhoto.title}

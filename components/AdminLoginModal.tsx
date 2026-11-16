@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Lock, LogIn, Eye, EyeOff, AlertCircle, X, ShieldCheck } from 'lucide-react';
+import { Lock, LogIn, Eye, EyeOff, AlertCircle, X, ShieldCheck, Cloud } from 'lucide-react';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (username: string, password: string) => boolean;
+  onLoginWithGoogle: () => Promise<{ ok: boolean; error?: string }>;
   onSuccess?: () => void;
   subtitle?: string;
 }
@@ -15,12 +16,14 @@ export default function AdminLoginModal({
   isOpen,
   onClose,
   onLogin,
+  onLoginWithGoogle,
   onSuccess,
-  subtitle = 'Masuk sebagai panitia admin untuk mengelola input jadwal dan hasil pertandingan.',
+  subtitle = 'Masuk sebagai panitia admin untuk mengelola input jadwal, hasil pertandingan, dan galeri.',
 }: AdminLoginModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -35,6 +38,22 @@ export default function AdminLoginModal({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage('');
+    setIsGoogleLoading(true);
+    try {
+      const result = await onLoginWithGoogle();
+      if (!result.ok) {
+        setErrorMessage(result.error || 'Gagal masuk dengan akun Google Panitia.');
+        return;
+      }
+      onClose();
+      onSuccess?.();
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +79,7 @@ export default function AdminLoginModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-login-title"
@@ -68,17 +87,17 @@ export default function AdminLoginModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md glass-card rounded-3xl border border-white/20 p-6 sm:p-8 shadow-2xl">
+      <div className="relative w-full sm:max-w-md glass-card rounded-t-3xl sm:rounded-3xl border border-white/20 p-5 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
           aria-label="Tutup jendela login admin"
-          className="absolute top-5 right-5 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors cursor-pointer"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 pr-12">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0">
             <ShieldCheck className="w-5 h-5" />
           </div>
@@ -92,7 +111,7 @@ export default function AdminLoginModal({
           </div>
         </div>
 
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">
           {subtitle}
         </p>
 
@@ -106,6 +125,29 @@ export default function AdminLoginModal({
           </div>
         )}
 
+        {/* Google Panitia Sign-In (Primary for Multi-Device Cloud Sync) */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isGoogleLoading}
+          className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+        >
+          <Cloud className="w-4 h-4 shrink-0" />
+          <span>
+            {isGoogleLoading
+              ? 'Menghubungkan Google Panitia...'
+              : 'Masuk dengan Google (Sync Semua Device)'}
+          </span>
+        </button>
+
+        <div className="relative my-5 flex items-center">
+          <div className="flex-1 border-t border-white/10" />
+          <span className="px-3 text-[11px] font-medium text-slate-400">
+            atau masuk dengan akun panitia
+          </span>
+          <div className="flex-1 border-t border-white/10" />
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="admin-username" className="block text-xs font-semibold text-slate-200 mb-2">
@@ -118,8 +160,7 @@ export default function AdminLoginModal({
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Masukkan username admin"
-              className="w-full px-4 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
-              autoFocus
+              className="w-full min-h-[44px] px-4 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
               required
             />
           </div>
@@ -136,41 +177,43 @@ export default function AdminLoginModal({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan password"
-                className="w-full pl-4 pr-11 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
+                className="w-full min-h-[44px] pl-4 pr-12 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          <div className="pt-3 flex items-center justify-end gap-3">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
+              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-white/15 hover:bg-white/20 border border-white/20 text-white font-bold text-xs active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <LogIn className="w-4 h-4" />
+              <LogIn className="w-4 h-4 text-cyan-300" />
               <span>Masuk Admin</span>
             </button>
           </div>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2 text-[11px] text-slate-400">
-          <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-          <span>Menu Input Jadwal & Input Hasil hanya aktif setelah login admin.</span>
+        <div className="mt-5 pt-4 border-t border-white/10 flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
+          <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+          <span>
+            Login dengan Google Panitia (<span className="text-slate-200 font-medium">dusun2.wanajaya@gmail.com</span>) membuat semua jadwal, skor, dan foto langsung berubah di seluruh HP/device warga.
+          </span>
         </div>
       </div>
     </div>
