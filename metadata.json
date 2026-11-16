@@ -1,0 +1,6 @@
+{
+  "name": "PORDUS 2 WANAJAYA KE-IV 2026",
+  "description": "Website Resmi Turnamen Olahraga Antar RW Dusun II Wanajaya Cibitung 2026. Jadwal pertandingan, peraturan, bagan turnamen, klasemen medali, galeri, dan pendaftaran kontingen.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
