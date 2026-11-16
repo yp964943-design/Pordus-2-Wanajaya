@@ -15,6 +15,8 @@ import {
   Pause,
   LayoutGrid,
   GalleryHorizontalEnd,
+  CalendarDays,
+  ChevronDown,
 } from 'lucide-react';
 import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
@@ -38,6 +40,7 @@ export default function Gallery({
   onRequestAdminLogin,
 }: GalleryProps) {
   const [filter, setFilter] = useState<string>('Semua');
+  const [dateFilter, setDateFilter] = useState<string>('Semua');
   const [viewMode, setViewMode] = useState<'slider' | 'grid'>('slider');
   const [slideIndex, setSlideIndex] = useState<number>(0);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
@@ -52,22 +55,71 @@ export default function Gallery({
     return [...customItems, ...GALLERY_ITEMS];
   }, [customItems]);
 
-  const filteredItems = useMemo(() => {
-    return allItems.filter((item) => {
-      if (filter === 'Semua') return true;
-      if (filter === 'Foto Baru') return Boolean(item.isCustom);
-      return item.category === filter;
-    });
-  }, [allItems, filter]);
+  const uniqueDates = useMemo(() => {
+    return Array.from(new Set(allItems.map((item) => item.date)));
+  }, [allItems]);
 
-  const itemCount = filteredItems.length;
+  const { groupedAlbums, orderedItems } = useMemo(() => {
+    const matched = allItems.filter((item) => {
+      const matchesSport =
+        filter === 'Semua'
+          ? true
+          : filter === 'Foto Baru'
+            ? Boolean(item.isCustom)
+            : item.category === filter;
+      const matchesDate = dateFilter === 'Semua' || item.date === dateFilter;
+      return matchesSport && matchesDate;
+    });
+
+    const albumMap = new Map<
+      string,
+      { key: string; category: string; date: string; items: GalleryItem[]; startIndex: number }
+    >();
+
+    matched.forEach((item) => {
+      const key = `${item.category}::${item.date}`;
+      const existing = albumMap.get(key);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        albumMap.set(key, {
+          key,
+          category: item.category,
+          date: item.date,
+          items: [item],
+          startIndex: 0,
+        });
+      }
+    });
+
+    const albums: {
+      key: string;
+      category: string;
+      date: string;
+      items: GalleryItem[];
+      startIndex: number;
+    }[] = [];
+    const flattened: GalleryItem[] = [];
+
+    albumMap.forEach((album) => {
+      albums.push({
+        ...album,
+        startIndex: flattened.length,
+      });
+      flattened.push(...album.items);
+    });
+
+    return { groupedAlbums: albums, orderedItems: flattened };
+  }, [allItems, filter, dateFilter]);
+
+  const itemCount = orderedItems.length;
   const safeIndex = itemCount > 0 ? ((slideIndex % itemCount) + itemCount) % itemCount : 0;
-  const activeSlideItem = itemCount > 0 ? filteredItems[safeIndex] : null;
+  const activeSlideItem = itemCount > 0 ? orderedItems[safeIndex] : null;
   const lightboxIndex = activePhotoId
-    ? filteredItems.findIndex((item) => item.id === activePhotoId)
+    ? orderedItems.findIndex((item) => item.id === activePhotoId)
     : -1;
   const activeLightboxPhoto =
-    lightboxIndex >= 0 ? filteredItems[lightboxIndex] : null;
+    lightboxIndex >= 0 ? orderedItems[lightboxIndex] : null;
 
   useEffect(() => {
     if (!isAutoPlaying || viewMode !== 'slider' || itemCount <= 1 || activePhotoId) {
@@ -87,21 +139,21 @@ export default function Gallery({
         setActivePhotoId(null);
       } else if (e.key === 'ArrowRight') {
         setActivePhotoId((currId) => {
-          const idx = filteredItems.findIndex((item) => item.id === currId);
+          const idx = orderedItems.findIndex((item) => item.id === currId);
           if (idx < 0) return currId;
-          return filteredItems[(idx + 1) % itemCount].id;
+          return orderedItems[(idx + 1) % itemCount].id;
         });
       } else if (e.key === 'ArrowLeft') {
         setActivePhotoId((currId) => {
-          const idx = filteredItems.findIndex((item) => item.id === currId);
+          const idx = orderedItems.findIndex((item) => item.id === currId);
           if (idx < 0) return currId;
-          return filteredItems[(idx - 1 + itemCount) % itemCount].id;
+          return orderedItems[(idx - 1 + itemCount) % itemCount].id;
         });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePhotoId, itemCount, filteredItems]);
+  }, [activePhotoId, itemCount, orderedItems]);
 
   const goToNextSlide = () => {
     if (itemCount <= 1) return;
@@ -122,6 +174,12 @@ export default function Gallery({
 
   const handleFilterChange = (nextFilter: string) => {
     setFilter(nextFilter);
+    setSlideDirection(1);
+    setSlideIndex(0);
+  };
+
+  const handleDateFilterChange = (nextDate: string) => {
+    setDateFilter(nextDate);
     setSlideDirection(1);
     setSlideIndex(0);
   };
@@ -162,6 +220,7 @@ export default function Gallery({
       return false;
     }
     setFilter('Foto Baru');
+    setDateFilter('Semua');
     setViewMode('slider');
     setSlideDirection(1);
     setSlideIndex(0);
@@ -218,68 +277,91 @@ export default function Gallery({
           </p>
         </div>
 
-        {/* Category Filters + View Switcher + Upload Galeri CTA */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap w-full lg:w-auto">
-            {filterCategories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => handleFilterChange(cat)}
-                className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  filter === cat
-                    ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-bold shadow-md'
-                    : 'glass-card text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
-                }`}
-              >
-                {cat === 'Foto Baru' ? `Foto Baru (${customItems.length})` : cat}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full lg:w-auto">
-            {/* View Mode Toggle: Slider / Grid */}
-            <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
-              <button
-                type="button"
-                onClick={() => setViewMode('slider')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                  viewMode === 'slider'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <GalleryHorizontalEnd className="w-3.5 h-3.5" />
-                <span>Slider</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                  viewMode === 'grid'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Grid</span>
-              </button>
+        {/* Category Filters + Date Filter + View Switcher + Upload Galeri CTA */}
+        <div className="flex flex-col gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap w-full lg:w-auto">
+              {filterCategories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleFilterChange(cat)}
+                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                    filter === cat
+                      ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-bold shadow-md'
+                      : 'glass-card text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
+                  }`}
+                >
+                  {cat === 'Foto Baru' ? `Foto Baru (${customItems.length})` : cat}
+                </button>
+              ))}
             </div>
 
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => onToggleUpload(!isUploadOpen)}
-                className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
-                  isUploadOpen
-                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
-                    : 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
-                }`}
-              >
-                <Upload className="w-4 h-4" />
-                <span>{isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
-              </button>
-            )}
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full lg:w-auto">
+              {/* Date Filter Dropdown */}
+              <div className="relative flex-1 sm:flex-initial sm:w-56">
+                <CalendarDays className="w-3.5 h-3.5 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  aria-label="Filter tanggal galeri"
+                  value={dateFilter}
+                  onChange={(e) => handleDateFilterChange(e.target.value)}
+                  className="w-full min-h-[44px] appearance-none pl-9 pr-9 py-2 text-xs font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                >
+                  <option value="Semua" className="bg-[#0a0f24] text-white">
+                    Semua Tanggal
+                  </option>
+                  {uniqueDates.map((d) => (
+                    <option key={d} value={d} className="bg-[#0a0f24] text-white">
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* View Mode Toggle: Slider / Grid */}
+              <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('slider')}
+                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                    viewMode === 'slider'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <GalleryHorizontalEnd className="w-3.5 h-3.5" />
+                  <span>Slider</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                    viewMode === 'grid'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Grid</span>
+                </button>
+              </div>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => onToggleUpload(!isUploadOpen)}
+                  className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer ${
+                    isUploadOpen
+                      ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/40'
+                      : 'bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 shadow-md hover:shadow-[0_0_20px_rgba(34,211,238,0.35)] active:scale-95'
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -323,7 +405,7 @@ export default function Gallery({
         {/* Empty State */}
         {itemCount === 0 ? (
           <div className="glass-card rounded-3xl border border-white/15 p-10 text-center text-sm text-slate-400">
-            Belum ada foto pada kategori ini.
+            Belum ada foto untuk kombinasi cabang olahraga dan tanggal tersebut.
           </div>
         ) : viewMode === 'slider' && activeSlideItem ? (
           /* SLIDER VIEW */
@@ -468,10 +550,40 @@ export default function Gallery({
               </div>
             </div>
 
+            {/* Grouped Album Quick Jump (Cabang Olahraga · Tanggal) */}
+            {groupedAlbums.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {groupedAlbums.map((album) => {
+                  const isActiveAlbum =
+                    activeSlideItem.category === album.category &&
+                    activeSlideItem.date === album.date;
+                  return (
+                    <button
+                      key={album.key}
+                      type="button"
+                      onClick={() => handleSelectSlide(album.startIndex)}
+                      className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
+                        isActiveAlbum
+                          ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/40'
+                          : 'bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 border-white/10'
+                      }`}
+                    >
+                      <span>{album.category}</span>
+                      <span className="mx-1.5 text-slate-500">·</span>
+                      <span className="text-slate-300 font-normal">{album.date}</span>
+                      <span className="ml-1.5 text-[11px] text-cyan-300 tabular-nums">
+                        ({album.items.length})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Thumbnail Strip Navigation */}
             {itemCount > 1 && (
               <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
-                {filteredItems.map((item, idx) => {
+                {orderedItems.map((item, idx) => {
                   const isActive = idx === safeIndex;
                   return (
                     <button
@@ -505,59 +617,83 @@ export default function Gallery({
             )}
           </div>
         ) : (
-          /* GRID VIEW */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item, idx) => (
-              <div
-                key={item.id}
-                onClick={() => setActivePhotoId(item.id)}
-                className={`group glass-card rounded-3xl overflow-hidden border border-white/15 cursor-pointer relative ${
-                  idx === 0 ? 'lg:col-span-2 aspect-[16/9]' : 'aspect-[4/3]'
-                }`}
-              >
-                <Image
-                  src={item.imageUrl}
-                  alt={item.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#070913] via-[#070913]/30 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-
-                {/* Top Right Actions: Delete (Custom + Admin) & Expand */}
-                <div className="absolute top-4 right-4 flex items-center gap-2">
-                  {isAdmin && item.isCustom && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDeleteCustomPhoto(item.id);
-                      }}
-                      aria-label={`Hapus foto ${item.title}`}
-                      title="Hapus foto unggahan"
-                      className="w-11 h-11 rounded-xl bg-black/60 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                  <div className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <Maximize2 className="w-4 h-4" />
+          /* GROUPED GRID VIEW (Cabang Olahraga & Tanggal) */
+          <div className="space-y-8">
+            {groupedAlbums.map((album) => (
+              <div key={album.key} className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm sm:text-base font-extrabold text-cyan-300">
+                      {album.category}
+                    </span>
+                    <span className="text-slate-500" aria-hidden="true">·</span>
+                    <span className="text-sm sm:text-base font-bold text-white flex items-center gap-1.5">
+                      <CalendarDays className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{album.date}</span>
+                    </span>
                   </div>
+                  <span className="text-xs font-semibold text-slate-400 tabular-nums">
+                    {album.items.length} Foto
+                  </span>
                 </div>
 
-                {/* Caption & Unboxed Metadata */}
-                <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 mb-1">
-                    <span>{item.category}</span>
-                    <span className="text-slate-500" aria-hidden="true">·</span>
-                    <span className="text-slate-300 font-normal">{item.date}</span>
-                  </div>
-                  <h4 className="text-base sm:text-lg font-bold text-white tracking-tight drop-shadow-md">
-                    {item.title}
-                  </h4>
-                  <p className="text-xs text-slate-300 mt-1 line-clamp-1">
-                    {item.caption}
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {album.items.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setActivePhotoId(item.id)}
+                      className={`group glass-card rounded-3xl overflow-hidden border border-white/15 cursor-pointer relative ${
+                        album.items.length > 1 && idx === 0
+                          ? 'sm:col-span-2 aspect-[16/9]'
+                          : 'aspect-[4/3]'
+                      }`}
+                    >
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#070913] via-[#070913]/30 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+
+                      {/* Top Right Actions: Delete (Custom + Admin) & Expand */}
+                      <div className="absolute top-4 right-4 flex items-center gap-2">
+                        {isAdmin && item.isCustom && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteCustomPhoto(item.id);
+                            }}
+                            aria-label={`Hapus foto ${item.title}`}
+                            title="Hapus foto unggahan"
+                            className="w-11 h-11 rounded-xl bg-black/60 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        <div className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <Maximize2 className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      {/* Caption & Unboxed Metadata */}
+                      <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 mb-1">
+                          <span>{item.category}</span>
+                          <span className="text-slate-500" aria-hidden="true">·</span>
+                          <span className="text-slate-300 font-normal">{item.date}</span>
+                        </div>
+                        <h4 className="text-base sm:text-lg font-bold text-white tracking-tight drop-shadow-md">
+                          {item.title}
+                        </h4>
+                        <p className="text-xs text-slate-300 mt-1 line-clamp-1">
+                          {item.caption}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -593,12 +729,12 @@ export default function Gallery({
                   () => {
                     if (itemCount <= 1) return;
                     const nextIdx = (lightboxIndex + 1) % itemCount;
-                    setActivePhotoId(filteredItems[nextIdx].id);
+                    setActivePhotoId(orderedItems[nextIdx].id);
                   },
                   () => {
                     if (itemCount <= 1) return;
                     const prevIdx = (lightboxIndex - 1 + itemCount) % itemCount;
-                    setActivePhotoId(filteredItems[prevIdx].id);
+                    setActivePhotoId(orderedItems[prevIdx].id);
                   }
                 )
               }
@@ -618,7 +754,7 @@ export default function Gallery({
                     type="button"
                     onClick={() => {
                       const prevIdx = (lightboxIndex - 1 + itemCount) % itemCount;
-                      setActivePhotoId(filteredItems[prevIdx].id);
+                      setActivePhotoId(orderedItems[prevIdx].id);
                     }}
                     aria-label="Foto sebelumnya"
                     className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-black/65 hover:bg-cyan-500 hover:text-slate-950 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
@@ -629,7 +765,7 @@ export default function Gallery({
                     type="button"
                     onClick={() => {
                       const nextIdx = (lightboxIndex + 1) % itemCount;
-                      setActivePhotoId(filteredItems[nextIdx].id);
+                      setActivePhotoId(orderedItems[nextIdx].id);
                     }}
                     aria-label="Foto berikutnya"
                     className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-black/65 hover:bg-cyan-500 hover:text-slate-950 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"

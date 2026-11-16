@@ -389,7 +389,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Seremoni',
     imageUrl: '/images/trophy_ceremony_pordus_1792865216253.jpg',
     caption: 'Momen sakral penyerahan trofi bergilir Kepala Dusun II Wanajaya kepada kontingen juara umum.',
-    date: 'PORDUS Wanajaya',
+    date: 'Minggu, 15 November 2026',
   },
   {
     id: 'g2',
@@ -397,7 +397,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Bulutangkis',
     imageUrl: '/images/badminton_action_pordus_1792865214621.jpg',
     caption: 'Aksi atlet ganda bulutangkis saat melepaskan jumping smash penentu match point di babak final.',
-    date: 'GOR Dusun II Wanajaya',
+    date: 'Sabtu, 21 November 2026',
   },
   {
     id: 'g3',
@@ -405,7 +405,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Bola Voli',
     imageUrl: '/images/volleyball_action_pordus_1792865214031.jpg',
     caption: 'Duel sengit di atas net antara spiker dan dua blocker tim voli dalam tensi kompetisi tinggi.',
-    date: 'SOR RW. 017',
+    date: 'Minggu, 15 November 2026',
   },
   {
     id: 'g4',
@@ -413,7 +413,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Tenis Meja',
     imageUrl: '/images/table_tennis_pordus_1792865216315.jpg',
     caption: 'Konsentrasi dan refleks kilat atlet tenis meja menyambut pukulan forehand loop top-spin.',
-    date: 'Gedung Serbaguna',
+    date: 'Sabtu, 21 November 2026',
   },
   {
     id: 'g5',
@@ -421,7 +421,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Seremoni',
     imageUrl: '/images/hero_pordus_sports_1792865214551.jpg',
     caption: 'Sorak sorai warga memadati tribun menghidupkan semangat sportivitas persaudaraan.',
-    date: 'Wanajaya Sports Arena',
+    date: 'Minggu, 15 November 2026',
   },
   {
     id: 'g6',
@@ -429,7 +429,7 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     category: 'Futsal Anak',
     imageUrl: '/images/futsal_anak_pordus_1794727648397.jpg',
     caption: 'Semangat juang talenta muda U-12 antar RW menunjukkan teknik dribble dan kerja sama tim.',
-    date: 'SOR RW 017',
+    date: 'Sabtu, 21 November 2026',
   },
 ];
 

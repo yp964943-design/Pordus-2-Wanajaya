@@ -94,6 +94,19 @@ async function compressImageToDataUrl(file: File): Promise<string> {
   return compressed;
 }
 
+function formatIndonesianDate(isoDate: string): string {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-').map(Number);
+  if (!year || !month || !day) return isoDate;
+  const dateObj = new Date(year, month - 1, day);
+  return new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(dateObj);
+}
+
 export default function GalleryUploadForm({
   onAddPhotos,
   onClose,
@@ -102,7 +115,7 @@ export default function GalleryUploadForm({
   const [slides, setSlides] = useState<PendingSlide[]>([]);
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [category, setCategory] = useState<GalleryItem['category']>('Bola Voli');
-  const [dateLocation, setDateLocation] = useState('SOR RW 017');
+  const [dateIso, setDateIso] = useState('2026-11-15');
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -198,7 +211,7 @@ export default function GalleryUploadForm({
       return;
     }
 
-    const trimmedDate = dateLocation.trim() || 'SOR RW 017';
+    const trimmedDate = formatIndonesianDate(dateIso) || 'Minggu, 15 November 2026';
     const baseTime = Date.now();
 
     const newItems: GalleryItem[] = slides.map((s, idx) => ({
@@ -444,15 +457,15 @@ export default function GalleryUploadForm({
                   htmlFor="gallery-photo-date"
                   className="block text-xs font-semibold text-slate-200 mb-2"
                 >
-                  Lokasi / Tanggal
+                  Tanggal Pertandingan
                 </label>
                 <input
                   id="gallery-photo-date"
-                  type="text"
-                  value={dateLocation}
-                  onChange={(e) => setDateLocation(e.target.value)}
-                  placeholder="SOR RW 017 · 15 Nov 2026"
-                  className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
+                  type="date"
+                  value={dateIso}
+                  onChange={(e) => setDateIso(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400"
+                  required
                 />
               </div>
             </div>

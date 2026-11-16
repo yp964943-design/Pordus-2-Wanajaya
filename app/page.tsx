@@ -9,6 +9,7 @@ import HubSection, { HubTab } from '@/components/HubSection';
 import RulesSection from '@/components/RulesSection';
 import Gallery from '@/components/Gallery';
 import VenueAndContact from '@/components/VenueAndContact';
+import SponsorSection from '@/components/SponsorSection';
 import Footer from '@/components/Footer';
 import AdminLoginModal from '@/components/AdminLoginModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -122,6 +123,9 @@ export default function HomePage() {
 
         {/* Section 6: Gelanggang & Kontak Panitia */}
         <VenueAndContact />
+
+        {/* Section 7: Sponsor Resmi */}
+        <SponsorSection />
       </main>
 
       {/* Footer */}

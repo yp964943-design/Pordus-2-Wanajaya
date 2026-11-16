@@ -4,18 +4,16 @@ import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  FileCheck2,
-  CalendarRange,
   Search,
   Trophy,
   Clock,
   MapPin,
-  ChevronRight,
   Filter,
   Shield,
   CalendarDays,
   ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Award,
   PlusCircle,
   CheckCircle2,
@@ -41,7 +39,7 @@ export type HubTab = 'jadwal' | 'hasil' | 'klasemen' | 'bagan';
 interface HubSectionProps {
   activeTab?: HubTab;
   onTabChange?: (tab: HubTab) => void;
-  onOpenRules: () => void;
+  onOpenRules?: () => void;
   isAdmin: boolean;
   adminPanel: 'none' | 'jadwal' | 'hasil';
   onAdminPanelChange: (panel: 'none' | 'jadwal' | 'hasil') => void;
@@ -334,12 +332,9 @@ function RwLogoImage({
   );
 }
 
-const INITIAL_ALL_DATES_LIMIT = 4;
-
 export default function HubSection({
   activeTab: controlledTab,
   onTabChange,
-  onOpenRules,
   isAdmin,
   adminPanel,
   onAdminPanelChange,
@@ -357,7 +352,7 @@ export default function HubSection({
   const [klasemenFilter, setKlasemenFilter] = useState<string>('Semua');
   const [dateFilter, setDateFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAllMatches, setShowAllMatches] = useState(false);
+  const [currentDatePage, setCurrentDatePage] = useState<number>(1);
   const [standings] = useState<RWStanding[]>(INITIAL_STANDINGS);
   const [selectedMatchForResult, setSelectedMatchForResult] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -409,10 +404,12 @@ export default function HubSection({
       return;
     }
     const result = await saveCustomMatch(newMatch);
+    const nextDates = Array.from(new Set([...allMatches, newMatch].map((m) => m.date)));
+    const targetPage = Math.max(1, nextDates.indexOf(newMatch.date) + 1);
     setSportFilter('Semua');
     setDateFilter('Semua');
     setSearchQuery('');
-    setShowAllMatches(true);
+    setCurrentDatePage(targetPage);
     setActiveTab('jadwal');
     onAdminPanelChange('none');
     const baseText = `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil ditambahkan.`;
@@ -499,24 +496,35 @@ export default function HubSection({
     return matchesSport && matchesDate && matchesSearch;
   });
 
-  const shouldLimitMatches =
-    dateFilter === 'Semua' &&
-    !searchQuery.trim() &&
-    filteredMatches.length > INITIAL_ALL_DATES_LIMIT;
+  const dateGroups = useMemo(() => {
+    const map = new Map<string, MatchItem[]>();
+    filteredMatches.forEach((match) => {
+      const list = map.get(match.date);
+      if (list) {
+        list.push(match);
+      } else {
+        map.set(match.date, [match]);
+      }
+    });
+    return Array.from(map.entries());
+  }, [filteredMatches]);
 
-  const visibleMatches =
-    shouldLimitMatches && !showAllMatches
-      ? filteredMatches.slice(0, INITIAL_ALL_DATES_LIMIT)
-      : filteredMatches;
+  const totalDatePages = dateGroups.length;
+  const safeDatePage =
+    totalDatePages > 0 ? Math.min(Math.max(1, currentDatePage), totalDatePages) : 1;
+  const activeDateGroup = totalDatePages > 0 ? dateGroups[safeDatePage - 1] : null;
 
-  const remainingMatchesCount = filteredMatches.length - visibleMatches.length;
+  // Show 1 date per page when paginated
+  const groupedMatches: Record<string, MatchItem[]> = activeDateGroup
+    ? { [activeDateGroup[0]]: activeDateGroup[1] }
+    : {};
 
-  // Group visible matches by date while preserving order
-  const groupedMatches = visibleMatches.reduce<Record<string, MatchItem[]>>((acc, match) => {
-    if (!acc[match.date]) acc[match.date] = [];
-    acc[match.date].push(match);
-    return acc;
-  }, {});
+  const handlePageChange = (page: number) => {
+    const next = Math.min(Math.max(1, page), Math.max(1, totalDatePages));
+    setCurrentDatePage(next);
+    const el = document.getElementById('hub-content-view');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <section id="jadwal" className="py-10 md:py-12 relative">
@@ -534,85 +542,6 @@ export default function HubSection({
           <p className="mt-4 text-sm sm:text-base text-slate-300">
             Akses cepat jadwal pertandingan, papan skor hasil laga, klasemen medali RW, dan buku pedoman peraturan teknis.
           </p>
-        </div>
-
-        {/* 3 Iconic Glass Cards (Compact horizontal tap rows on mobile, tall cards on md+) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 md:gap-6 mb-8 sm:mb-10">
-          
-          {/* Card 1: Hasil Pertandingan */}
-          <div
-            onClick={() => {
-              setActiveTab('hasil');
-              const el = document.getElementById('hub-content-view');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
-          >
-            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-cyan-500/10 shrink-0">
-              <Award className="w-6 h-6 md:w-10 md:h-10 text-cyan-400" />
-            </div>
-            <div className="flex-1 md:flex-initial min-w-0">
-              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
-                Hasil Pertandingan
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
-                Rekapitulasi skor set demi set dan hasil akhir pertandingan antar kontingen RW Dusun II Wanajaya.
-              </p>
-            </div>
-            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-cyan-400 group-hover:translate-x-1 transition-transform shrink-0">
-              <span className="hidden md:inline">Lihat Hasil Laga</span>
-              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
-            </div>
-          </div>
-
-          {/* Card 2: Peraturan Pertandingan */}
-          <div
-            onClick={onOpenRules}
-            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
-          >
-            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-emerald-500/10 shrink-0">
-              <FileCheck2 className="w-6 h-6 md:w-10 md:h-10 text-emerald-400" />
-            </div>
-            <div className="flex-1 md:flex-initial min-w-0">
-              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
-                Peraturan Pertandingan
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
-                Pedoman teknis, kriteria domisili atlet KTP Dusun II, tata tertib, dan sanksi fair play.
-              </p>
-            </div>
-            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0">
-              <span className="hidden md:inline">Baca Pedoman Teknis</span>
-              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
-            </div>
-          </div>
-
-          {/* Card 3: Jadwal Pertandingan */}
-          <div
-            onClick={() => {
-              setActiveTab('jadwal');
-              const el = document.getElementById('hub-content-view');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="group glass-card glass-card-hover rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-white/15 cursor-pointer relative overflow-hidden flex flex-row md:flex-col items-center justify-between text-left md:text-center gap-3.5 md:gap-0"
-          >
-            <div className="w-12 h-12 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-400/30 flex items-center justify-center md:mb-6 group-hover:scale-105 transition-transform shadow-lg shadow-amber-500/10 shrink-0">
-              <CalendarRange className="w-6 h-6 md:w-10 md:h-10 text-amber-400" />
-            </div>
-            <div className="flex-1 md:flex-initial min-w-0">
-              <h3 className="text-base md:text-xl font-bold text-white mb-0.5 md:mb-2">
-                Jadwal & Hasil Pertandingan
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2 md:line-clamp-none">
-                Agenda lengkap fase grup, bagan knockout, hingga partai final perebutan medali.
-              </p>
-            </div>
-            <div className="md:mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:translate-x-1 transition-transform shrink-0">
-              <span className="hidden md:inline">Lihat Jadwal & Hasil</span>
-              <ChevronRight className="w-5 h-5 md:w-4 md:h-4" />
-            </div>
-          </div>
-
         </div>
 
         {/* Interactive Hub Content Area with Tabs */}
@@ -672,7 +601,10 @@ export default function HubSection({
                     type="text"
                     placeholder="Cari RW, cabang, atau grup..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentDatePage(1);
+                    }}
                     className="w-full min-h-[44px] pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl glass-input text-slate-100 placeholder-slate-400 transition-all"
                   />
                 </div>
@@ -817,7 +749,10 @@ export default function HubSection({
                   {['Semua', 'Bola Voli', 'Bulu Tangkis', 'Tenis Meja', 'Futsal Anak'].map((sport) => (
                     <button
                       key={sport}
-                      onClick={() => setSportFilter(sport)}
+                      onClick={() => {
+                        setSportFilter(sport);
+                        setCurrentDatePage(1);
+                      }}
                       className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                         sportFilter === sport
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
@@ -841,7 +776,7 @@ export default function HubSection({
                       value={dateFilter}
                       onChange={(e) => {
                         setDateFilter(e.target.value);
-                        setShowAllMatches(false);
+                        setCurrentDatePage(1);
                       }}
                       className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
                     >
@@ -1172,30 +1107,68 @@ export default function HubSection({
                     </div>
                   ))}
 
-                  {shouldLimitMatches && (
+                  {totalDatePages > 1 && (
                     <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
                       <p className="text-xs text-slate-400 text-center sm:text-left">
-                        Menampilkan{' '}
-                        <span className="font-semibold text-slate-200">{visibleMatches.length}</span> dari{' '}
-                        <span className="font-semibold text-slate-200">{filteredMatches.length}</span> pertandingan (Semua Tanggal)
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowAllMatches((prev) => !prev)}
-                        className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded-xl bg-white/10 hover:bg-cyan-500/20 border border-white/15 hover:border-cyan-400/40 text-xs sm:text-sm font-bold text-cyan-300 hover:text-cyan-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {showAllMatches ? (
+                        Tanggal{' '}
+                        <span className="font-semibold text-slate-200">{safeDatePage}</span> dari{' '}
+                        <span className="font-semibold text-slate-200">{totalDatePages}</span>
+                        {activeDateGroup && (
                           <>
-                            <span>Tampilkan Lebih Ringkas</span>
-                            <ChevronUp className="w-4 h-4" />
-                          </>
-                        ) : (
-                          <>
-                            <span>Selengkapnya ({remainingMatchesCount} Pertandingan Lainnya)</span>
-                            <ChevronDown className="w-4 h-4" />
+                            {' '}· <span className="text-cyan-300 font-semibold">{activeDateGroup[0]}</span>
                           </>
                         )}
-                      </button>
+                      </p>
+                      <nav
+                        aria-label="Pagination jadwal per tanggal"
+                        className="flex flex-wrap items-center justify-center gap-1.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handlePageChange(safeDatePage - 1)}
+                          disabled={safeDatePage <= 1}
+                          aria-label="Tanggal sebelumnya"
+                          className="min-h-[44px] px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 text-xs font-semibold text-slate-200 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span className="hidden sm:inline">Sebelumnya</span>
+                        </button>
+
+                        {dateGroups.map(([dateLabel], idx) => {
+                          const pageNum = idx + 1;
+                          const isCurrent = pageNum === safeDatePage;
+                          const shortDate = dateLabel.replace(/^[^,]+,\s*/, '');
+                          return (
+                            <button
+                              key={dateLabel}
+                              type="button"
+                              onClick={() => handlePageChange(pageNum)}
+                              aria-current={isCurrent ? 'page' : undefined}
+                              className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer tabular-nums ${
+                                isCurrent
+                                  ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md'
+                                  : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/15'
+                              }`}
+                            >
+                              <span>{pageNum}</span>
+                              <span className="hidden md:inline font-medium ml-1">
+                                · {shortDate}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => handlePageChange(safeDatePage + 1)}
+                          disabled={safeDatePage >= totalDatePages}
+                          aria-label="Tanggal berikutnya"
+                          className="min-h-[44px] px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 text-xs font-semibold text-slate-200 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <span className="hidden sm:inline">Berikutnya</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </nav>
                     </div>
                   )}
                 </div>
