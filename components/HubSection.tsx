@@ -21,7 +21,8 @@ import {
   ClipboardEdit,
   X,
   LogOut,
-  Cloud
+  Cloud,
+  Users
 } from 'lucide-react';
 import { MATCHES_SCHEDULE, INITIAL_STANDINGS, RW_LOGOS, MatchItem, RWStanding } from '@/data/pordusData';
 import MatchScheduleForm from '@/components/MatchScheduleForm';
@@ -781,125 +782,123 @@ export default function HubSection({
                 )}
               </AnimatePresence>
 
-              {/* Filters Row: Cabor + Kategori Putra/Putri + Tanggal Dropdown */}
-              <div className="space-y-3 mb-6 sm:mb-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap">
-                    <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1 shrink-0">
-                      <Filter className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Cabor:</span>
-                    </span>
-                    {['Semua', 'Bola Voli', 'Bulu Tangkis', 'Tenis Meja', 'Futsal Anak'].map((sport) => (
-                      <button
-                        key={sport}
-                        type="button"
-                        onClick={() => {
-                          setSportFilter(sport);
-                          setCurrentDatePage(1);
-                        }}
-                        className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                          sportFilter === sport
-                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
-                            : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
-                        }`}
-                      >
-                        {sport}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Date Dropdown Filter */}
-                  <div className="flex items-center gap-2.5 w-full md:w-auto">
-                    <label htmlFor="date-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                      <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Tanggal:</span>
-                    </label>
-                    <div className="relative flex-1 md:w-64">
-                      <select
-                        id="date-filter-select"
-                        value={effectiveDateFilter}
-                        onChange={(e) => {
-                          setDateFilter(e.target.value);
-                          setCurrentDatePage(1);
-                        }}
-                        className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-                      >
-                        <option value="Semua" className="bg-[#0a0f24] text-white">
-                          Semua Tanggal
+              {/* Filters Row: Cabor, Kategori Putra/Putri, RW & Tanggal Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6 sm:mb-8">
+                {/* Cabor Dropdown Filter */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="sport-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Filter className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Cabor:</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="sport-filter-select"
+                      value={sportFilter}
+                      onChange={(e) => {
+                        setSportFilter(e.target.value);
+                        setCurrentDatePage(1);
+                      }}
+                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    >
+                      <option value="Semua" className="bg-[#0a0f24] text-white">
+                        Semua Cabor
+                      </option>
+                      {['Bola Voli', 'Bulu Tangkis', 'Tenis Meja', 'Futsal Anak'].map((sport) => (
+                        <option key={sport} value={sport} className="bg-[#0a0f24] text-white">
+                          {sport}
                         </option>
-                        {uniqueDates.map((d) => (
-                          <option key={d} value={d} className="bg-[#0a0f24] text-white">
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* Putra / Putri Category Filter + RW Filter */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-slate-400 mr-1 shrink-0">
-                      Kategori:
-                    </span>
-                    {(['Semua', 'Putra', 'Putri'] as const).map((cat) => {
-                      const isActive = categoryFilter === cat;
-                      const activeClass =
-                        cat === 'Putra'
-                          ? 'bg-sky-500/20 text-sky-300 border border-sky-400/45 shadow-sm font-bold'
-                          : cat === 'Putri'
-                            ? 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/45 shadow-sm font-bold'
-                            : 'bg-white/15 text-white border border-white/25 shadow-sm font-semibold';
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setCategoryFilter(cat);
-                            setCurrentDatePage(1);
-                          }}
-                          className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                            isActive
-                              ? activeClass
-                              : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5 font-medium'
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      );
-                    })}
+                {/* Kategori Putra / Putri Dropdown Filter */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="category-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Users className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Kategori:</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="category-filter-select"
+                      value={categoryFilter}
+                      onChange={(e) => {
+                        setCategoryFilter(e.target.value as 'Semua' | 'Putra' | 'Putri');
+                        setCurrentDatePage(1);
+                      }}
+                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    >
+                      <option value="Semua" className="bg-[#0a0f24] text-white">
+                        Semua Kategori
+                      </option>
+                      <option value="Putra" className="bg-[#0a0f24] text-white">
+                        Putra
+                      </option>
+                      <option value="Putri" className="bg-[#0a0f24] text-white">
+                        Putri
+                      </option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
+                </div>
 
-                  {/* RW Dropdown Filter */}
-                  <div className="flex items-center gap-2.5 w-full md:w-auto">
-                    <label htmlFor="rw-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                      <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>RW:</span>
-                    </label>
-                    <div className="relative flex-1 md:w-64">
-                      <select
-                        id="rw-filter-select"
-                        value={rwFilter}
-                        onChange={(e) => {
-                          setRwFilter(e.target.value);
-                          setCurrentDatePage(1);
-                        }}
-                        className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-                      >
-                        <option value="Semua" className="bg-[#0a0f24] text-white">
-                          Semua RW
+                {/* RW Dropdown Filter */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="rw-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>RW:</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="rw-filter-select"
+                      value={rwFilter}
+                      onChange={(e) => {
+                        setRwFilter(e.target.value);
+                        setCurrentDatePage(1);
+                      }}
+                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    >
+                      <option value="Semua" className="bg-[#0a0f24] text-white">
+                        Semua RW
+                      </option>
+                      {uniqueRws.map((rwItem) => (
+                        <option key={rwItem} value={rwItem} className="bg-[#0a0f24] text-white">
+                          {rwItem}
+                          {RW_LOGOS[rwItem]?.name ? ` · ${RW_LOGOS[rwItem].name}` : ''}
                         </option>
-                        {uniqueRws.map((rwItem) => (
-                          <option key={rwItem} value={rwItem} className="bg-[#0a0f24] text-white">
-                            {rwItem}
-                            {RW_LOGOS[rwItem]?.name ? ` · ${RW_LOGOS[rwItem].name}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Date Dropdown Filter */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="date-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
+                    <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Tanggal:</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="date-filter-select"
+                      value={effectiveDateFilter}
+                      onChange={(e) => {
+                        setDateFilter(e.target.value);
+                        setCurrentDatePage(1);
+                      }}
+                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    >
+                      <option value="Semua" className="bg-[#0a0f24] text-white">
+                        Semua Tanggal
+                      </option>
+                      {uniqueDates.map((d) => (
+                        <option key={d} value={d} className="bg-[#0a0f24] text-white">
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
               </div>

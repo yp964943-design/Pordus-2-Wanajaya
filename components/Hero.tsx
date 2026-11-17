@@ -23,7 +23,7 @@ export default function Hero({ onOpenSchedule, onOpenResults }: HeroProps) {
         <div className="flex flex-col items-center text-center mb-4">
           <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-white p-1.5 border border-white/25 shadow-xl shadow-cyan-500/15 mb-3.5 sm:mb-4 overflow-hidden flex items-center justify-center">
             <Image
-              src="/assets/aistudio/logo_panitia_0d0b11fa"
+              src="/images/logo_panitia_0d0b11fa.png"
               alt="Logo Panitia PORDUS 2 Wanajaya Ke-IV 2026"
               width={96}
               height={96}
