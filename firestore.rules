@@ -95,6 +95,16 @@ service cloud.firestore {
         (!('createdAt' in data) || data.createdAt is number);
     }
 
+    function isValidComment(data) {
+      return data.keys().hasAll(['id', 'name', 'rw', 'message', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'name', 'rw', 'message', 'createdAt']) &&
+        isValidId(data.id) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.rw is string && data.rw.size() >= 1 && data.rw.size() <= 32 &&
+        data.message is string && data.message.size() >= 3 && data.message.size() <= 500 &&
+        data.createdAt is number && data.createdAt > 0;
+    }
+
     // Connection health check path (read-only)
     match /test/connection {
       allow get: if true;
@@ -139,6 +149,15 @@ service cloud.firestore {
         incoming().id == existing().id &&
         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'caption', 'date']);
       allow delete: if isValidId(itemId);
+    }
+
+    // Public tournament comments (PII-free) - readable & schema-validated sync across all devices
+    match /comments/{commentId} {
+      allow get: if isValidId(commentId);
+      allow list: if true;
+      allow create: if isValidId(commentId) && isValidComment(incoming()) && incoming().id == commentId;
+      allow update: if false;
+      allow delete: if isValidId(commentId);
     }
 
     // Admin registry locked down

@@ -1108,52 +1108,51 @@ export default function HubSection({
                   ))}
 
                   {totalDatePages > 1 && (
-                    <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-                      <p className="text-xs text-slate-400 text-center sm:text-left">
-                        Tanggal{' '}
-                        <span className="font-semibold text-slate-200">{safeDatePage}</span> dari{' '}
-                        <span className="font-semibold text-slate-200">{totalDatePages}</span>
+                    <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
+                      <p className="text-xs text-slate-400 tabular-nums">
+                        <span className="font-semibold text-slate-200">{safeDatePage}/{totalDatePages}</span>
                         {activeDateGroup && (
                           <>
-                            {' '}· <span className="text-cyan-300 font-semibold">{activeDateGroup[0]}</span>
+                            {' · '}
+                            <span className="text-cyan-300 font-medium">
+                              {activeDateGroup[0].replace(/^[^,]+,\s*/, '')}
+                            </span>
                           </>
                         )}
                       </p>
                       <nav
                         aria-label="Pagination jadwal per tanggal"
-                        className="flex flex-wrap items-center justify-center gap-1.5"
+                        className="flex flex-wrap items-center gap-1"
                       >
                         <button
                           type="button"
                           onClick={() => handlePageChange(safeDatePage - 1)}
                           disabled={safeDatePage <= 1}
                           aria-label="Tanggal sebelumnya"
-                          className="min-h-[44px] px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 text-xs font-semibold text-slate-200 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Tanggal sebelumnya"
+                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
                           <ChevronLeft className="w-4 h-4" />
-                          <span className="hidden sm:inline">Sebelumnya</span>
                         </button>
 
                         {dateGroups.map(([dateLabel], idx) => {
                           const pageNum = idx + 1;
                           const isCurrent = pageNum === safeDatePage;
-                          const shortDate = dateLabel.replace(/^[^,]+,\s*/, '');
                           return (
                             <button
                               key={dateLabel}
                               type="button"
                               onClick={() => handlePageChange(pageNum)}
                               aria-current={isCurrent ? 'page' : undefined}
-                              className={`min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer tabular-nums ${
+                              aria-label={`Halaman ${pageNum}: ${dateLabel}`}
+                              title={dateLabel}
+                              className={`min-h-[40px] min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
                                 isCurrent
-                                  ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-md'
-                                  : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/15'
+                                  ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
+                                  : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
                               }`}
                             >
-                              <span>{pageNum}</span>
-                              <span className="hidden md:inline font-medium ml-1">
-                                · {shortDate}
-                              </span>
+                              {pageNum}
                             </button>
                           );
                         })}
@@ -1163,9 +1162,9 @@ export default function HubSection({
                           onClick={() => handlePageChange(safeDatePage + 1)}
                           disabled={safeDatePage >= totalDatePages}
                           aria-label="Tanggal berikutnya"
-                          className="min-h-[44px] px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 text-xs font-semibold text-slate-200 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Tanggal berikutnya"
+                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
-                          <span className="hidden sm:inline">Berikutnya</span>
                           <ChevronRight className="w-4 h-4" />
                         </button>
                       </nav>

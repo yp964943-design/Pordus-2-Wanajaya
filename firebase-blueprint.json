@@ -68,6 +68,19 @@
         "role": { "type": "string", "enum": ["admin"] }
       },
       "required": ["uid", "role"]
+    },
+    "TournamentComment": {
+      "title": "TournamentComment",
+      "description": "Public resident comment and support message for PORDUS 2 Wanajaya Ke-IV 2026 synced across all devices.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "rw": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "message": { "type": "string", "minLength": 3, "maxLength": 500 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "rw", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -86,6 +99,10 @@
     "/admins/{uid}": {
       "schema": { "$ref": "#/entities/AdminUser" },
       "description": "Admin role membership documents."
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/TournamentComment" },
+      "description": "Stores resident comments and words of support displayed above the sponsor section."
     }
   }
 }

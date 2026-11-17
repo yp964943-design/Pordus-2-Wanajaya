@@ -23,8 +23,8 @@ export default function Hero({ onOpenSchedule, onOpenResults }: HeroProps) {
         <div className="flex flex-col items-center text-center mb-4">
           <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-white p-1.5 border border-white/25 shadow-xl shadow-cyan-500/15 mb-3.5 sm:mb-4 overflow-hidden flex items-center justify-center">
             <Image
-              src="/assets/aistudio/Logo_PORDUS_2_8042f99b.png"
-              alt="Logo Resmi PORDUS 2 Wanajaya"
+              src="/assets/aistudio/logo_panitia_0d0b11fa"
+              alt="Logo Panitia PORDUS 2 Wanajaya Ke-IV 2026"
               width={96}
               height={96}
               priority
@@ -74,21 +74,20 @@ export default function Hero({ onOpenSchedule, onOpenResults }: HeroProps) {
 
         {/* Dynamic Visual Banner with Responsive KPI Bar */}
         <div className="mt-6 sm:mt-8 relative rounded-3xl overflow-hidden glass-card border border-white/15 p-2 sm:p-3 shadow-2xl">
-          <div className="relative aspect-[16/9] sm:aspect-[21/9] w-full rounded-2xl overflow-hidden">
+          <div className="relative aspect-[3/2] w-full rounded-2xl overflow-hidden bg-[#070913]">
             <Image
-              src="/images/hero_pordus_sports_1792865214551.jpg"
-              alt="Turnamen Olahraga PORDUS 2 Wanajaya Cibitung 2026"
+              src="/assets/aistudio/IMG-20261019-WA0009_157e53c5.jpg"
+              alt="Banner Resmi PORDUS II Ke-4 Desa Wanajaya - H Jalal Cup 2026"
               fill
               priority
-              className="object-cover object-center scale-105 hover:scale-100 transition-transform duration-700"
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              className="object-contain object-center"
               referrerPolicy="no-referrer"
             />
-            {/* Scrim Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070913]/90 via-[#070913]/30 to-transparent" />
           </div>
 
-          {/* Glass Stats Bar: Cleanly stacked below photo on mobile (< md), overlaid at bottom on md+ */}
-          <div className="mt-2.5 md:mt-0 md:absolute md:bottom-6 md:left-6 md:right-6">
+          {/* Glass Stats Bar: Cleanly stacked below poster so full event poster remains unobstructed */}
+          <div className="mt-2.5 sm:mt-3">
             <div className="backdrop-blur-xl bg-[#070913]/85 border border-white/15 rounded-2xl p-3.5 sm:p-5 md:p-6 shadow-2xl">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5 md:gap-6 md:divide-x divide-white/10">
                 <div className="md:px-3 text-center md:text-left">

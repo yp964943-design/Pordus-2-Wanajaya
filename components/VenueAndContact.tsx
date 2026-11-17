@@ -16,7 +16,7 @@ export default function VenueAndContact() {
               Pusat Gelanggang & Panitia Pelaksana
             </h3>
             <p className="mt-3 text-sm text-slate-300">
-              Penyelenggaraan PORDUS 2 Wanajaya Ke-IV 2026 berpusat di fasilitas olahraga terpadu Dusun II Wanajaya Cibitung.
+              Penyelenggaraan PORDUS 2 Wanajaya Ke-IV 2026 berpusat di Sarana Olahraga RW 017 Pesona Gading Cibitung.
             </p>
           </div>
 
@@ -26,7 +26,7 @@ export default function VenueAndContact() {
                 <MapPin className="w-5 h-5" />
               </div>
               <div>
-                <h5 className="font-bold text-white">Gelanggang Olahraga Dusun II</h5>
+                <h5 className="font-bold text-white">RW017 Pesona Gading Cibitung</h5>
                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                   Desa Wanajaya, Kecamatan Cibitung, Kabupaten Bekasi, Jawa Barat
                 </p>
@@ -63,7 +63,7 @@ export default function VenueAndContact() {
 
           <div className="mt-8 pt-6 border-t border-white/10 flex items-center gap-3 text-xs text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Didukung oleh Pengurus RW 01 - RW 12 & Karang Taruna Dusun II Wanajaya</span>
+            <span>Didukung oleh Pengurus RW 01 - RW 12 &amp; Komite Olahraga Dusun II Wanajaya</span>
           </div>
         </div>
       </div>

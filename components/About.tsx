@@ -49,7 +49,7 @@ export default function About() {
           {/* Exact Verbatim Text from User Attachment */}
           <div className="mt-6 glass-card rounded-3xl p-6 sm:p-8 border border-white/15 relative overflow-hidden text-left sm:text-center">
             <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
-              <span className="font-bold text-white">PORDUS 2 WANAJAYA KE-IV</span> adalah ajang turnamen olahraga tahunan yang mempertemukan para atlet dan warga dari <span className="text-cyan-300 font-semibold">12 Rukun Warga (RW)</span> di lingkungan Dusun 2 Wanajaya. Acara ini bertujuan untuk mempererat tali silaturahmi, menumbuhkan semangat sportivitas, serta mencari bibit unggul olahraga di tingkat dusun.
+              <span className="font-bold text-white">PORDUS 2 WANAJAYA KE-IV</span> adalah ajang turnamen olahraga tahunan yang mempertemukan para atlet dan warga dari <span className="text-cyan-300 font-semibold">12 Rukun Warga (RW)</span> di lingkungan Dusun 2 Wanajaya, bertempat di <span className="text-white font-semibold">RW 017 Pesona Gading Cibitung</span> sebagai tuan rumah. Acara ini bertujuan untuk mempererat tali silaturahmi, menumbuhkan semangat sportivitas, serta mencari bibit unggul olahraga di tingkat dusun.
             </p>
             
             <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">

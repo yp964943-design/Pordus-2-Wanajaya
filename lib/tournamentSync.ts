@@ -635,3 +635,105 @@ export async function syncLocalChangesToCloud(): Promise<void> {
 
   return pendingSyncInFlight;
 }
+
+export interface TournamentComment {
+  id: string;
+  name: string;
+  rw: string;
+  message: string;
+  createdAt: number;
+}
+
+function sanitizeCommentDoc(comment: TournamentComment) {
+  return {
+    id: String(comment.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128),
+    name: String(comment.name).trim().slice(0, 80),
+    rw: String(comment.rw).trim().slice(0, 32) || 'Umum / Warga',
+    message: String(comment.message).trim().slice(0, 500),
+    createdAt: Number(comment.createdAt) > 0 ? Number(comment.createdAt) : Date.now(),
+  };
+}
+
+export function useCommentsSync() {
+  const [comments, setComments] = useState<TournamentComment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string>('');
+
+  useEffect(() => {
+    testFirestoreConnection();
+
+    const unsubComments = onSnapshot(
+      collection(db, 'comments'),
+      (snapshot) => {
+        const list: TournamentComment[] = snapshot.docs
+          .map((d) => {
+            const data = d.data() as Record<string, unknown>;
+            return {
+              id: d.id,
+              name: String(data.name || ''),
+              rw: String(data.rw || 'Umum / Warga'),
+              message: String(data.message || ''),
+              createdAt: Number(data.createdAt || 0),
+            };
+          })
+          .filter((c) => c.name.trim().length > 0 && c.message.trim().length > 0)
+          .sort((a, b) => b.createdAt - a.createdAt);
+
+        setComments(list);
+        setIsLoading(false);
+        setLoadError('');
+      },
+      (error) => {
+        const errInfo = buildFirestoreErrorInfo(
+          error,
+          OperationType.LIST,
+          'comments'
+        );
+        console.error('Firestore Error: ', JSON.stringify(errInfo));
+        setIsLoading(false);
+        setLoadError('Gagal memuat daftar komentar.');
+      }
+    );
+
+    return () => unsubComments();
+  }, []);
+
+  return { comments, isLoading, loadError };
+}
+
+export async function saveComment(comment: TournamentComment): Promise<CloudWriteResult> {
+  const sanitized = sanitizeCommentDoc(comment);
+  const docPath = `comments/${sanitized.id}`;
+  try {
+    await setDoc(doc(db, 'comments', sanitized.id), sanitized);
+    return { syncedToCloud: true };
+  } catch (error) {
+    try {
+      handleFirestoreError(error, OperationType.WRITE, docPath);
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal mengirim komentar ke server.',
+      };
+    }
+  }
+}
+
+export async function removeComment(commentId: string): Promise<CloudWriteResult> {
+  try {
+    await deleteDoc(doc(db, 'comments', commentId));
+    return { syncedToCloud: true };
+  } catch (error) {
+    try {
+      handleFirestoreError(error, OperationType.DELETE, `comments/${commentId}`);
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal menghapus komentar.',
+      };
+    }
+  }
+}
+
