@@ -349,6 +349,8 @@ export default function HubSection({
   };
 
   const [sportFilter, setSportFilter] = useState<string>('Semua');
+  const [categoryFilter, setCategoryFilter] = useState<'Semua' | 'Putra' | 'Putri'>('Semua');
+  const [rwFilter, setRwFilter] = useState<string>('Semua');
   const [klasemenFilter, setKlasemenFilter] = useState<string>('Semua');
   const [dateFilter, setDateFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -407,6 +409,8 @@ export default function HubSection({
     const nextDates = Array.from(new Set([...allMatches, newMatch].map((m) => m.date)));
     const targetPage = Math.max(1, nextDates.indexOf(newMatch.date) + 1);
     setSportFilter('Semua');
+    setCategoryFilter('Semua');
+    setRwFilter('Semua');
     setDateFilter('Semua');
     setSearchQuery('');
     setCurrentDatePage(targetPage);
@@ -478,11 +482,42 @@ export default function HubSection({
     el?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const uniqueDates = Array.from(new Set(allMatches.map((m) => m.date)));
+  const uniqueRws = Array.from(
+    new Set([
+      ...Object.keys(RW_LOGOS),
+      ...allMatches.flatMap((m) => [m.teamA.rw, m.teamB.rw]),
+    ])
+  ).sort((a, b) => a.localeCompare(b));
+
+  const matchesCategoryFilter = (match: MatchItem, cat: 'Semua' | 'Putra' | 'Putri') => {
+    if (cat === 'Semua') return true;
+    const lower = match.category.toLowerCase();
+    if (cat === 'Putra') return lower.includes('putra');
+    return lower.includes('putri');
+  };
+
+  const uniqueDates = Array.from(
+    new Set(
+      allMatches
+        .filter(
+          (m) =>
+            (sportFilter === 'Semua' || m.sport === sportFilter) &&
+            matchesCategoryFilter(m, categoryFilter) &&
+            (rwFilter === 'Semua' || m.teamA.rw === rwFilter || m.teamB.rw === rwFilter)
+        )
+        .map((m) => m.date)
+    )
+  );
+
+  const effectiveDateFilter =
+    dateFilter === 'Semua' || uniqueDates.includes(dateFilter) ? dateFilter : 'Semua';
 
   const filteredMatches = allMatches.filter((match) => {
     const matchesSport = sportFilter === 'Semua' || match.sport === sportFilter;
-    const matchesDate = dateFilter === 'Semua' || match.date === dateFilter;
+    const matchesCategory = matchesCategoryFilter(match, categoryFilter);
+    const matchesRw =
+      rwFilter === 'Semua' || match.teamA.rw === rwFilter || match.teamB.rw === rwFilter;
+    const matchesDate = effectiveDateFilter === 'Semua' || match.date === effectiveDateFilter;
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
       match.teamA.rw.toLowerCase().includes(query) ||
@@ -493,7 +528,7 @@ export default function HubSection({
       match.sport.toLowerCase().includes(query) ||
       match.category.toLowerCase().includes(query) ||
       match.venue.toLowerCase().includes(query);
-    return matchesSport && matchesDate && matchesSearch;
+    return matchesSport && matchesCategory && matchesRw && matchesDate && matchesSearch;
   });
 
   const dateGroups = useMemo(() => {
@@ -509,15 +544,22 @@ export default function HubSection({
     return Array.from(map.entries());
   }, [filteredMatches]);
 
+  // When filtering by Cabor or RW (via dropdown or search), show all matching matches without date pagination
+  const showAllWithoutDatePagination =
+    sportFilter !== 'Semua' ||
+    rwFilter !== 'Semua' ||
+    searchQuery.trim().length > 0;
+
   const totalDatePages = dateGroups.length;
   const safeDatePage =
     totalDatePages > 0 ? Math.min(Math.max(1, currentDatePage), totalDatePages) : 1;
   const activeDateGroup = totalDatePages > 0 ? dateGroups[safeDatePage - 1] : null;
 
-  // Show 1 date per page when paginated
-  const groupedMatches: Record<string, MatchItem[]> = activeDateGroup
-    ? { [activeDateGroup[0]]: activeDateGroup[1] }
-    : {};
+  const groupedMatches: Record<string, MatchItem[]> = showAllWithoutDatePagination
+    ? Object.fromEntries(dateGroups)
+    : activeDateGroup
+      ? { [activeDateGroup[0]]: activeDateGroup[1] }
+      : {};
 
   const handlePageChange = (page: number) => {
     const next = Math.min(Math.max(1, page), Math.max(1, totalDatePages));
@@ -739,57 +781,125 @@ export default function HubSection({
                 )}
               </AnimatePresence>
 
-              {/* Filters Row: Cabor Horizontal Scroll on Mobile + Tanggal Dropdown */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 mb-6 sm:mb-8">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1 shrink-0">
-                    <Filter className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Cabor:</span>
-                  </span>
-                  {['Semua', 'Bola Voli', 'Bulu Tangkis', 'Tenis Meja', 'Futsal Anak'].map((sport) => (
-                    <button
-                      key={sport}
-                      onClick={() => {
-                        setSportFilter(sport);
-                        setCurrentDatePage(1);
-                      }}
-                      className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        sportFilter === sport
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
-                          : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
-                      }`}
-                    >
-                      {sport}
-                    </button>
-                  ))}
+              {/* Filters Row: Cabor + Kategori Putra/Putri + Tanggal Dropdown */}
+              <div className="space-y-3 mb-6 sm:mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap">
+                    <span className="text-xs text-slate-400 flex items-center gap-1.5 mr-1 shrink-0">
+                      <Filter className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Cabor:</span>
+                    </span>
+                    {['Semua', 'Bola Voli', 'Bulu Tangkis', 'Tenis Meja', 'Futsal Anak'].map((sport) => (
+                      <button
+                        key={sport}
+                        type="button"
+                        onClick={() => {
+                          setSportFilter(sport);
+                          setCurrentDatePage(1);
+                        }}
+                        className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                          sportFilter === sport
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-sm'
+                            : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
+                        }`}
+                      >
+                        {sport}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date Dropdown Filter */}
+                  <div className="flex items-center gap-2.5 w-full md:w-auto">
+                    <label htmlFor="date-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                      <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Tanggal:</span>
+                    </label>
+                    <div className="relative flex-1 md:w-64">
+                      <select
+                        id="date-filter-select"
+                        value={effectiveDateFilter}
+                        onChange={(e) => {
+                          setDateFilter(e.target.value);
+                          setCurrentDatePage(1);
+                        }}
+                        className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                      >
+                        <option value="Semua" className="bg-[#0a0f24] text-white">
+                          Semua Tanggal
+                        </option>
+                        {uniqueDates.map((d) => (
+                          <option key={d} value={d} className="bg-[#0a0f24] text-white">
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Date Dropdown Filter */}
-                <div className="flex items-center gap-2.5 w-full md:w-auto">
-                  <label htmlFor="date-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                    <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Tanggal:</span>
-                  </label>
-                  <div className="relative flex-1 md:w-64">
-                    <select
-                      id="date-filter-select"
-                      value={dateFilter}
-                      onChange={(e) => {
-                        setDateFilter(e.target.value);
-                        setCurrentDatePage(1);
-                      }}
-                      className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-                    >
-                      <option value="Semua" className="bg-[#0a0f24] text-white">
-                        Semua Tanggal
-                      </option>
-                      {uniqueDates.map((d) => (
-                        <option key={d} value={d} className="bg-[#0a0f24] text-white">
-                          {d}
+                {/* Putra / Putri Category Filter + RW Filter */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-slate-400 mr-1 shrink-0">
+                      Kategori:
+                    </span>
+                    {(['Semua', 'Putra', 'Putri'] as const).map((cat) => {
+                      const isActive = categoryFilter === cat;
+                      const activeClass =
+                        cat === 'Putra'
+                          ? 'bg-sky-500/20 text-sky-300 border border-sky-400/45 shadow-sm font-bold'
+                          : cat === 'Putri'
+                            ? 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-400/45 shadow-sm font-bold'
+                            : 'bg-white/15 text-white border border-white/25 shadow-sm font-semibold';
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setCategoryFilter(cat);
+                            setCurrentDatePage(1);
+                          }}
+                          className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                            isActive
+                              ? activeClass
+                              : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5 font-medium'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* RW Dropdown Filter */}
+                  <div className="flex items-center gap-2.5 w-full md:w-auto">
+                    <label htmlFor="rw-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                      <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>RW:</span>
+                    </label>
+                    <div className="relative flex-1 md:w-64">
+                      <select
+                        id="rw-filter-select"
+                        value={rwFilter}
+                        onChange={(e) => {
+                          setRwFilter(e.target.value);
+                          setCurrentDatePage(1);
+                        }}
+                        className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                      >
+                        <option value="Semua" className="bg-[#0a0f24] text-white">
+                          Semua RW
                         </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        {uniqueRws.map((rwItem) => (
+                          <option key={rwItem} value={rwItem} className="bg-[#0a0f24] text-white">
+                            {rwItem}
+                            {RW_LOGOS[rwItem]?.name ? ` · ${RW_LOGOS[rwItem].name}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -848,7 +958,17 @@ export default function HubSection({
                               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                 <span className="font-bold text-cyan-300">{match.sport}</span>
                                 <span className="text-slate-500">·</span>
-                                <span className="text-slate-200 font-semibold">{match.category}</span>
+                                <span
+                                  className={`font-semibold ${
+                                    match.category.toLowerCase().includes('putri')
+                                      ? 'text-fuchsia-300'
+                                      : match.category.toLowerCase().includes('putra')
+                                        ? 'text-sky-300'
+                                        : 'text-slate-200'
+                                  }`}
+                                >
+                                  {match.category}
+                                </span>
                                 <span className="text-slate-500">·</span>
                                 <span className="text-amber-300 font-bold">{match.round}</span>
                               </div>
@@ -1107,7 +1227,7 @@ export default function HubSection({
                     </div>
                   ))}
 
-                  {totalDatePages > 1 && (
+                  {!showAllWithoutDatePagination && totalDatePages > 1 && (
                     <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
                       <p className="text-xs text-slate-400 tabular-nums">
                         <span className="font-semibold text-slate-200">{safeDatePage}/{totalDatePages}</span>

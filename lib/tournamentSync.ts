@@ -638,19 +638,33 @@ export async function syncLocalChangesToCloud(): Promise<void> {
 
 export interface TournamentComment {
   id: string;
+  parentId?: string;
   name: string;
   rw: string;
   message: string;
   createdAt: number;
 }
 
-function sanitizeCommentDoc(comment: TournamentComment) {
+function sanitizeCommentDoc(comment: TournamentComment): {
+  id: string;
+  name: string;
+  rw: string;
+  message: string;
+  createdAt: number;
+  parentId?: string;
+} {
+  const cleanId = String(comment.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+  const cleanParentId = comment.parentId
+    ? String(comment.parentId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128)
+    : '';
+
   return {
-    id: String(comment.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128),
+    id: cleanId,
     name: String(comment.name).trim().slice(0, 80),
     rw: String(comment.rw).trim().slice(0, 32) || 'Umum / Warga',
     message: String(comment.message).trim().slice(0, 500),
     createdAt: Number(comment.createdAt) > 0 ? Number(comment.createdAt) : Date.now(),
+    ...(cleanParentId ? { parentId: cleanParentId } : {}),
   };
 }
 
@@ -668,8 +682,10 @@ export function useCommentsSync() {
         const list: TournamentComment[] = snapshot.docs
           .map((d) => {
             const data = d.data() as Record<string, unknown>;
+            const rawParent = typeof data.parentId === 'string' ? data.parentId.trim() : '';
             return {
               id: d.id,
+              ...(rawParent ? { parentId: rawParent } : {}),
               name: String(data.name || ''),
               rw: String(data.rw || 'Umum / Warga'),
               message: String(data.message || ''),

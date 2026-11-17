@@ -97,8 +97,9 @@ service cloud.firestore {
 
     function isValidComment(data) {
       return data.keys().hasAll(['id', 'name', 'rw', 'message', 'createdAt']) &&
-        data.keys().hasOnly(['id', 'name', 'rw', 'message', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'parentId', 'name', 'rw', 'message', 'createdAt']) &&
         isValidId(data.id) &&
+        (!('parentId' in data) || isValidId(data.parentId)) &&
         data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
         data.rw is string && data.rw.size() >= 1 && data.rw.size() <= 32 &&
         data.message is string && data.message.size() >= 3 && data.message.size() <= 500 &&
@@ -151,11 +152,14 @@ service cloud.firestore {
       allow delete: if isValidId(itemId);
     }
 
-    // Public tournament comments (PII-free) - readable & schema-validated sync across all devices
+    // Public tournament comments & replies (PII-free) - readable & schema-validated sync across all devices
     match /comments/{commentId} {
       allow get: if isValidId(commentId);
       allow list: if true;
-      allow create: if isValidId(commentId) && isValidComment(incoming()) && incoming().id == commentId;
+      allow create: if isValidId(commentId) &&
+        isValidComment(incoming()) &&
+        incoming().id == commentId &&
+        (!('parentId' in incoming()) || exists(/databases/$(database)/documents/comments/$(incoming().parentId)));
       allow update: if false;
       allow delete: if isValidId(commentId);
     }
