@@ -86,15 +86,17 @@ export default function Gallery({
     >();
 
     matched.forEach((item) => {
-      const key = `${item.category}::${item.date}`;
+      const normalizedCategory = item.category.trim();
+      const normalizedDate = item.date.trim();
+      const key = `${normalizedCategory}::${normalizedDate}`;
       const existing = albumMap.get(key);
       if (existing) {
         existing.items.push(item);
       } else {
         albumMap.set(key, {
           key,
-          category: item.category,
-          date: item.date,
+          category: normalizedCategory,
+          date: normalizedDate,
           items: [item],
           startIndex: 0,
         });
@@ -421,10 +423,25 @@ export default function Gallery({
                           Pilih foto untuk dibuka ({itemCount} foto)...
                         </option>
                       )}
-                      {orderedItems.map((item, idx) => (
-                        <option key={item.id} value={item.id} className="bg-[#0a0f24] text-white">
-                          {String(idx + 1).padStart(2, '0')} · {item.title} ({item.category})
-                        </option>
+                      {groupedAlbums.map((album) => (
+                        <optgroup
+                          key={album.key}
+                          label={`${album.category} · ${album.date} (${album.items.length} Foto)`}
+                          className="bg-[#0a0f24] text-cyan-300 font-bold"
+                        >
+                          {album.items.map((item, localIdx) => {
+                            const globalIdx = album.startIndex + localIdx;
+                            return (
+                              <option
+                                key={item.id}
+                                value={item.id}
+                                className="bg-[#0a0f24] text-white font-normal"
+                              >
+                                {String(globalIdx + 1).padStart(2, '0')} · {item.title}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
                       ))}
                     </>
                   )}
@@ -687,79 +704,109 @@ export default function Gallery({
               </div>
             </div>
 
-            {/* Grouped Album Quick Jump (Cabang Olahraga · Tanggal) */}
-            {groupedAlbums.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {groupedAlbums.map((album) => {
-                  const isActiveAlbum =
-                    activeSlideItem.category === album.category &&
-                    activeSlideItem.date === album.date;
-                  return (
-                    <button
-                      key={album.key}
-                      type="button"
-                      onClick={() => handleSelectSlide(album.startIndex)}
-                      className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer border ${
-                        isActiveAlbum
-                          ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400/40'
-                          : 'bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 border-white/10'
-                      }`}
-                    >
-                      <span>{album.category}</span>
-                      <span className="mx-1.5 text-slate-500">·</span>
-                      <span className="text-slate-300 font-normal">{album.date}</span>
-                      <span className="ml-1.5 text-[11px] text-cyan-300 tabular-nums">
-                        ({album.items.length})
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* Combined Photos Grouped by Cabor & Tanggal */}
+            {groupedAlbums.length > 0 && (
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <Images className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Foto Digabungkan per Cabor & Tanggal</span>
+                  </h4>
+                  <span className="text-[11px] sm:text-xs text-slate-400 tabular-nums">
+                    {groupedAlbums.length} Grup · {itemCount} Foto
+                  </span>
+                </div>
 
-            {/* Thumbnail Strip Navigation */}
-            {itemCount > 1 && (
-              <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
-                {orderedItems.map((item, idx) => {
-                  const isActive = idx === safeIndex;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleSelectSlide(idx)}
-                      aria-label={`Pilih slide ${idx + 1}: ${item.title}`}
-                      className={`group relative w-28 sm:w-36 aspect-[16/10] rounded-2xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer text-left ${
-                        isActive
-                          ? 'border-cyan-400 shadow-lg shadow-cyan-500/20 scale-[1.02]'
-                          : 'border-white/10 opacity-60 hover:opacity-100 hover:border-white/30'
-                      }`}
-                    >
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                      <div className="absolute bottom-1.5 left-2 right-2">
-                        <p className="text-[11px] font-semibold text-white truncate">
-                          {item.title}
-                        </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {groupedAlbums.map((album) => {
+                    const isActiveAlbum =
+                      activeSlideItem.category.trim() === album.category &&
+                      activeSlideItem.date.trim() === album.date;
+                    return (
+                      <div
+                        key={album.key}
+                        className={`rounded-2xl border p-3 sm:p-4 transition-all ${
+                          isActiveAlbum
+                            ? 'bg-cyan-500/[0.08] border-cyan-400/45 shadow-lg shadow-cyan-500/10'
+                            : 'bg-white/[0.03] border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSlide(album.startIndex)}
+                          className="w-full flex items-center justify-between gap-2 mb-3 text-left cursor-pointer group"
+                        >
+                          <div className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span
+                              className={`text-xs sm:text-sm font-extrabold ${
+                                isActiveAlbum
+                                  ? 'text-cyan-300'
+                                  : 'text-white group-hover:text-cyan-200'
+                              }`}
+                            >
+                              {album.category}
+                            </span>
+                            <span className="text-slate-500" aria-hidden="true">·</span>
+                            <span className="text-xs text-slate-300 flex items-center gap-1">
+                              <CalendarDays className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span>{album.date}</span>
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[11px] font-semibold text-cyan-300 tabular-nums shrink-0">
+                            {album.items.length} Foto
+                          </span>
+                        </button>
+
+                        <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                          {album.items.map((item, localIdx) => {
+                            const globalIdx = album.startIndex + localIdx;
+                            const isActive = globalIdx === safeIndex;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleSelectSlide(globalIdx)}
+                                aria-label={`Pilih foto ${item.title} (${album.category} · ${album.date})`}
+                                className={`relative w-28 sm:w-32 aspect-[16/10] rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer text-left ${
+                                  isActive
+                                    ? 'border-cyan-400 shadow-md shadow-cyan-500/25 scale-[1.02]'
+                                    : 'border-white/15 opacity-75 hover:opacity-100 hover:border-white/35'
+                                }`}
+                              >
+                                <Image
+                                  src={item.imageUrl}
+                                  alt={item.title}
+                                  fill
+                                  className="object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                                <div className="absolute bottom-1.5 left-2 right-2">
+                                  <p className="text-[11px] font-semibold text-white truncate">
+                                    {item.title}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </button>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         ) : (
           /* GROUPED GRID VIEW (Cabang Olahraga & Tanggal) */
-          <div className="space-y-8">
+          <div className="space-y-6">
             {groupedAlbums.map((album) => (
-              <div key={album.key} className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-white/10">
-                  <div className="flex items-center gap-2.5">
+              <div
+                key={album.key}
+                className="glass-card rounded-3xl border border-white/12 p-4 sm:p-6 space-y-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                     <span className="text-sm sm:text-base font-extrabold text-cyan-300">
                       {album.category}
                     </span>
@@ -769,7 +816,7 @@ export default function Gallery({
                       <span>{album.date}</span>
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-400 tabular-nums">
+                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-cyan-300 tabular-nums">
                     {album.items.length} Foto
                   </span>
                 </div>

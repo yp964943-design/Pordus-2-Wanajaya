@@ -70,19 +70,49 @@ function TeamLogoBox({ logo, rw }: { logo?: string; rw: string }) {
   );
 }
 
-const DEFAULT_SETS = [
+type EditableScore = number | '';
+
+interface EditableSet {
+  set: number;
+  scoreA: EditableScore;
+  scoreB: EditableScore;
+}
+
+type EditableBadmintonDouble = Omit<BadmintonDoublePartai, 'scoreA' | 'scoreB'> & {
+  scoreA: EditableScore;
+  scoreB: EditableScore;
+};
+
+type EditableTableTennisPartai = Omit<TableTennisPartai, 'scoreA' | 'scoreB'> & {
+  scoreA: EditableScore;
+  scoreB: EditableScore;
+};
+
+function normalizeScoreInput(raw: string, max = 999): EditableScore {
+  const digits = raw.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+  if (digits === '') return '';
+  const parsed = Number.parseInt(digits, 10);
+  if (Number.isNaN(parsed)) return '';
+  return Math.max(0, Math.min(max, parsed));
+}
+
+function toScoreNum(val: EditableScore): number {
+  return typeof val === 'number' && !Number.isNaN(val) ? val : 0;
+}
+
+const DEFAULT_SETS: EditableSet[] = [
   { set: 1, scoreA: 0, scoreB: 0 },
   { set: 2, scoreA: 0, scoreB: 0 },
   { set: 3, scoreA: 0, scoreB: 0 },
 ];
 
-const DEFAULT_BADMINTON_DOUBLES: BadmintonDoublePartai[] = [
+const DEFAULT_BADMINTON_DOUBLES: EditableBadmintonDouble[] = [
   { partai: 1, label: 'Ganda 1', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
   { partai: 2, label: 'Ganda 2', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
   { partai: 3, label: 'Ganda 3', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
 ];
 
-const DEFAULT_TABLE_TENNIS_MATCHES: TableTennisPartai[] = [
+const DEFAULT_TABLE_TENNIS_MATCHES: EditableTableTennisPartai[] = [
   { partai: 1, label: 'Ganda 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
   { partai: 2, label: 'Tunggal 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
   { partai: 3, label: 'Ganda 2', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
@@ -113,17 +143,17 @@ export default function MatchResultForm({
   const [scoreB, setScoreB] = useState<string>(
     String(startingMatch?.teamB.score ?? 0)
   );
-  const [sets, setSets] = useState<{ set: number; scoreA: number; scoreB: number }[]>(
+  const [sets, setSets] = useState<EditableSet[]>(
     startingMatch?.sets && startingMatch.sets.length > 0
       ? startingMatch.sets.map((s) => ({ ...s }))
       : DEFAULT_SETS.map((s) => ({ ...s }))
   );
-  const [badmintonDoubles, setBadmintonDoubles] = useState<BadmintonDoublePartai[]>(
+  const [badmintonDoubles, setBadmintonDoubles] = useState<EditableBadmintonDouble[]>(
     startingMatch?.badmintonDoubles && startingMatch.badmintonDoubles.length > 0
       ? startingMatch.badmintonDoubles.map((d) => ({ ...d }))
       : DEFAULT_BADMINTON_DOUBLES.map((d) => ({ ...d }))
   );
-  const [tableTennisMatches, setTableTennisMatches] = useState<TableTennisPartai[]>(
+  const [tableTennisMatches, setTableTennisMatches] = useState<EditableTableTennisPartai[]>(
     startingMatch?.tableTennisMatches && startingMatch.tableTennisMatches.length > 0
       ? startingMatch.tableTennisMatches.map((p) => ({ ...p }))
       : DEFAULT_TABLE_TENNIS_MATCHES.map((p) => ({ ...p }))
@@ -185,9 +215,9 @@ export default function MatchResultForm({
     side: 'scoreA' | 'scoreB',
     rawValue: string
   ) => {
-    const numeric = Math.max(0, Number.parseInt(rawValue || '0', 10) || 0);
+    const nextVal = normalizeScoreInput(rawValue, 999);
     const updatedSets = sets.map((s) =>
-      s.set === setNumber ? { ...s, [side]: numeric } : s
+      s.set === setNumber ? { ...s, [side]: nextVal } : s
     );
     setSets(updatedSets);
 
@@ -195,8 +225,10 @@ export default function MatchResultForm({
     let winsA = 0;
     let winsB = 0;
     updatedSets.forEach((s) => {
-      if (s.scoreA > s.scoreB) winsA += 1;
-      else if (s.scoreB > s.scoreA) winsB += 1;
+      const a = toScoreNum(s.scoreA);
+      const b = toScoreNum(s.scoreB);
+      if (a > b) winsA += 1;
+      else if (b > a) winsB += 1;
     });
     if (winsA > 0 || winsB > 0) {
       setScoreA(String(winsA));
@@ -204,25 +236,59 @@ export default function MatchResultForm({
     }
   };
 
+  const handleSetScoreFocus = (setNumber: number, side: 'scoreA' | 'scoreB') => {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.set === setNumber && s[side] === 0 ? { ...s, [side]: '' } : s
+      )
+    );
+  };
+
+  const handleSetScoreBlur = (setNumber: number, side: 'scoreA' | 'scoreB') => {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.set === setNumber && s[side] === '' ? { ...s, [side]: 0 } : s
+      )
+    );
+  };
+
   const handleBadmintonScoreChange = (
     partaiNumber: number,
     side: 'scoreA' | 'scoreB',
     rawValue: string
   ) => {
-    const numeric = Math.max(0, Math.min(42, Number.parseInt(rawValue || '0', 10) || 0));
+    const nextVal = normalizeScoreInput(rawValue, 42);
     const updatedDoubles = badmintonDoubles.map((d) =>
-      d.partai === partaiNumber ? { ...d, [side]: numeric } : d
+      d.partai === partaiNumber ? { ...d, [side]: nextVal } : d
     );
     setBadmintonDoubles(updatedDoubles);
 
     let winsA = 0;
     let winsB = 0;
     updatedDoubles.forEach((d) => {
-      if (d.scoreA > d.scoreB) winsA += 1;
-      else if (d.scoreB > d.scoreA) winsB += 1;
+      const a = toScoreNum(d.scoreA);
+      const b = toScoreNum(d.scoreB);
+      if (a > b) winsA += 1;
+      else if (b > a) winsB += 1;
     });
     setScoreA(String(winsA));
     setScoreB(String(winsB));
+  };
+
+  const handleBadmintonScoreFocus = (partaiNumber: number, side: 'scoreA' | 'scoreB') => {
+    setBadmintonDoubles((prev) =>
+      prev.map((d) =>
+        d.partai === partaiNumber && d[side] === 0 ? { ...d, [side]: '' } : d
+      )
+    );
+  };
+
+  const handleBadmintonScoreBlur = (partaiNumber: number, side: 'scoreA' | 'scoreB') => {
+    setBadmintonDoubles((prev) =>
+      prev.map((d) =>
+        d.partai === partaiNumber && d[side] === '' ? { ...d, [side]: 0 } : d
+      )
+    );
   };
 
   const handleBadmintonPairChange = (
@@ -240,20 +306,38 @@ export default function MatchResultForm({
     side: 'scoreA' | 'scoreB',
     rawValue: string
   ) => {
-    const numeric = Math.max(0, Number.parseInt(rawValue || '0', 10) || 0);
+    const nextVal = normalizeScoreInput(rawValue, 999);
     const updatedMatches = tableTennisMatches.map((p) =>
-      p.partai === partaiNumber ? { ...p, [side]: numeric } : p
+      p.partai === partaiNumber ? { ...p, [side]: nextVal } : p
     );
     setTableTennisMatches(updatedMatches);
 
     let winsA = 0;
     let winsB = 0;
     updatedMatches.forEach((p) => {
-      if (p.scoreA > p.scoreB) winsA += 1;
-      else if (p.scoreB > p.scoreA) winsB += 1;
+      const a = toScoreNum(p.scoreA);
+      const b = toScoreNum(p.scoreB);
+      if (a > b) winsA += 1;
+      else if (b > a) winsB += 1;
     });
     setScoreA(String(winsA));
     setScoreB(String(winsB));
+  };
+
+  const handleTableTennisScoreFocus = (partaiNumber: number, side: 'scoreA' | 'scoreB') => {
+    setTableTennisMatches((prev) =>
+      prev.map((p) =>
+        p.partai === partaiNumber && p[side] === 0 ? { ...p, [side]: '' } : p
+      )
+    );
+  };
+
+  const handleTableTennisScoreBlur = (partaiNumber: number, side: 'scoreA' | 'scoreB') => {
+    setTableTennisMatches((prev) =>
+      prev.map((p) =>
+        p.partai === partaiNumber && p[side] === '' ? { ...p, [side]: 0 } : p
+      )
+    );
   };
 
   const handleTableTennisPlayerChange = (
@@ -322,8 +406,8 @@ export default function MatchResultForm({
       return;
     }
 
-    const parsedA = Number.parseInt(scoreA, 10);
-    const parsedB = Number.parseInt(scoreB, 10);
+    const parsedA = scoreA.trim() === '' ? 0 : Number.parseInt(scoreA, 10);
+    const parsedB = scoreB.trim() === '' ? 0 : Number.parseInt(scoreB, 10);
 
     if (Number.isNaN(parsedA) || Number.isNaN(parsedB) || parsedA < 0 || parsedB < 0) {
       setErrorMessage('Skor pertandingan harus berupa angka 0 atau lebih.');
@@ -352,11 +436,21 @@ export default function MatchResultForm({
       scoreA: parsedA,
       scoreB: parsedB,
       winner: resolvedWinner,
-      ...(isVolleyball ? { sets } : {}),
+      ...(isVolleyball
+        ? {
+            sets: sets.map((s) => ({
+              set: s.set,
+              scoreA: toScoreNum(s.scoreA),
+              scoreB: toScoreNum(s.scoreB),
+            })),
+          }
+        : {}),
       ...(isBadminton
         ? {
             badmintonDoubles: badmintonDoubles.map((d) => ({
               ...d,
+              scoreA: toScoreNum(d.scoreA),
+              scoreB: toScoreNum(d.scoreB),
               pairA: d.pairA?.trim() || '',
               pairB: d.pairB?.trim() || '',
             })),
@@ -366,6 +460,8 @@ export default function MatchResultForm({
         ? {
             tableTennisMatches: tableTennisMatches.map((p) => ({
               ...p,
+              scoreA: toScoreNum(p.scoreA),
+              scoreB: toScoreNum(p.scoreB),
               playerA: p.playerA?.trim() || '',
               playerB: p.playerB?.trim() || '',
             })),
@@ -495,7 +591,15 @@ export default function MatchResultForm({
                   type="number"
                   min={0}
                   value={scoreA}
-                  onChange={(e) => setScoreA(e.target.value)}
+                  onFocus={() => {
+                    if (scoreA === '0') setScoreA('');
+                  }}
+                  onBlur={() => {
+                    if (scoreA.trim() === '') setScoreA('0');
+                  }}
+                  onChange={(e) =>
+                    setScoreA(e.target.value.replace(/^0+(?=\d)/, ''))
+                  }
                   className="w-full px-3 py-2 text-center text-lg font-black rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-emerald-400 tabular-nums"
                   required
                 />
@@ -532,7 +636,15 @@ export default function MatchResultForm({
                   type="number"
                   min={0}
                   value={scoreB}
-                  onChange={(e) => setScoreB(e.target.value)}
+                  onFocus={() => {
+                    if (scoreB === '0') setScoreB('');
+                  }}
+                  onBlur={() => {
+                    if (scoreB.trim() === '') setScoreB('0');
+                  }}
+                  onChange={(e) =>
+                    setScoreB(e.target.value.replace(/^0+(?=\d)/, ''))
+                  }
                   className="w-full px-3 py-2 text-center text-lg font-black rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-emerald-400 tabular-nums"
                   required
                 />
@@ -553,10 +665,12 @@ export default function MatchResultForm({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 {badmintonDoubles.map((d) => {
+                  const scoreANum = toScoreNum(d.scoreA);
+                  const scoreBNum = toScoreNum(d.scoreB);
                   const winnerText =
-                    d.scoreA > d.scoreB
+                    scoreANum > scoreBNum
                       ? selectedMatch.teamA.rw
-                      : d.scoreB > d.scoreA
+                      : scoreBNum > scoreANum
                         ? selectedMatch.teamB.rw
                         : null;
                   return (
@@ -625,6 +739,8 @@ export default function MatchResultForm({
                             max={42}
                             aria-label={`Skor ${d.label} ${selectedMatch.teamA.rw}`}
                             value={d.scoreA}
+                            onFocus={() => handleBadmintonScoreFocus(d.partai, 'scoreA')}
+                            onBlur={() => handleBadmintonScoreBlur(d.partai, 'scoreA')}
                             onChange={(e) =>
                               handleBadmintonScoreChange(d.partai, 'scoreA', e.target.value)
                             }
@@ -637,6 +753,8 @@ export default function MatchResultForm({
                             max={42}
                             aria-label={`Skor ${d.label} ${selectedMatch.teamB.rw}`}
                             value={d.scoreB}
+                            onFocus={() => handleBadmintonScoreFocus(d.partai, 'scoreB')}
+                            onBlur={() => handleBadmintonScoreBlur(d.partai, 'scoreB')}
                             onChange={(e) =>
                               handleBadmintonScoreChange(d.partai, 'scoreB', e.target.value)
                             }
@@ -672,6 +790,8 @@ export default function MatchResultForm({
                         min={0}
                         aria-label={`Skor Set ${s.set} ${selectedMatch.teamA.rw}`}
                         value={s.scoreA}
+                        onFocus={() => handleSetScoreFocus(s.set, 'scoreA')}
+                        onBlur={() => handleSetScoreBlur(s.set, 'scoreA')}
                         onChange={(e) =>
                           handleSetScoreChange(s.set, 'scoreA', e.target.value)
                         }
@@ -683,6 +803,8 @@ export default function MatchResultForm({
                         min={0}
                         aria-label={`Skor Set ${s.set} ${selectedMatch.teamB.rw}`}
                         value={s.scoreB}
+                        onFocus={() => handleSetScoreFocus(s.set, 'scoreB')}
+                        onBlur={() => handleSetScoreBlur(s.set, 'scoreB')}
                         onChange={(e) =>
                           handleSetScoreChange(s.set, 'scoreB', e.target.value)
                         }
@@ -708,10 +830,12 @@ export default function MatchResultForm({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {tableTennisMatches.map((p) => {
+                  const scoreANum = toScoreNum(p.scoreA);
+                  const scoreBNum = toScoreNum(p.scoreB);
                   const winnerText =
-                    p.scoreA > p.scoreB
+                    scoreANum > scoreBNum
                       ? selectedMatch.teamA.rw
-                      : p.scoreB > p.scoreA
+                      : scoreBNum > scoreANum
                         ? selectedMatch.teamB.rw
                         : null;
                   const isSingle = p.label.startsWith('Tunggal');
@@ -780,6 +904,8 @@ export default function MatchResultForm({
                             min={0}
                             aria-label={`Skor ${p.label} ${selectedMatch.teamA.rw}`}
                             value={p.scoreA}
+                            onFocus={() => handleTableTennisScoreFocus(p.partai, 'scoreA')}
+                            onBlur={() => handleTableTennisScoreBlur(p.partai, 'scoreA')}
                             onChange={(e) =>
                               handleTableTennisScoreChange(p.partai, 'scoreA', e.target.value)
                             }
@@ -791,6 +917,8 @@ export default function MatchResultForm({
                             min={0}
                             aria-label={`Skor ${p.label} ${selectedMatch.teamB.rw}`}
                             value={p.scoreB}
+                            onFocus={() => handleTableTennisScoreFocus(p.partai, 'scoreB')}
+                            onBlur={() => handleTableTennisScoreBlur(p.partai, 'scoreB')}
                             onChange={(e) =>
                               handleTableTennisScoreChange(p.partai, 'scoreB', e.target.value)
                             }
