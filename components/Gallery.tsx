@@ -17,12 +17,17 @@ import {
   GalleryHorizontalEnd,
   CalendarDays,
   ChevronDown,
+  Pencil,
+  Filter,
+  Images,
 } from 'lucide-react';
 import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
+import GalleryEditModal from '@/components/GalleryEditModal';
 import {
   removeGalleryItem,
   saveGalleryItems,
+  updateGalleryItem,
   useGallerySync,
 } from '@/lib/tournamentSync';
 
@@ -46,14 +51,18 @@ export default function Gallery({
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<GalleryItem | null>(null);
   const [successMessage, setSuccessMessage] = useState<string>('');
   const touchStartXRef = useRef<number | null>(null);
 
-  const { customItems } = useGallerySync();
+  const { customItems, defaultOverrides } = useGallerySync();
 
   const allItems = useMemo<GalleryItem[]>(() => {
-    return [...customItems, ...GALLERY_ITEMS];
-  }, [customItems]);
+    const mergedDefaults = GALLERY_ITEMS.map(
+      (item) => defaultOverrides[item.id] ?? item
+    );
+    return [...customItems, ...mergedDefaults];
+  }, [customItems, defaultOverrides]);
 
   const uniqueDates = useMemo(() => {
     return Array.from(new Set(allItems.map((item) => item.date)));
@@ -121,8 +130,10 @@ export default function Gallery({
   const activeLightboxPhoto =
     lightboxIndex >= 0 ? orderedItems[lightboxIndex] : null;
 
+  const isEditingModalOpen = editingItem !== null;
+
   useEffect(() => {
-    if (!isAutoPlaying || viewMode !== 'slider' || itemCount <= 1 || activePhotoId) {
+    if (!isAutoPlaying || viewMode !== 'slider' || itemCount <= 1 || activePhotoId || isEditingModalOpen) {
       return;
     }
     const timer = window.setInterval(() => {
@@ -130,10 +141,10 @@ export default function Gallery({
       setSlideIndex((prev) => (prev + 1) % itemCount);
     }, 4500);
     return () => window.clearInterval(timer);
-  }, [isAutoPlaying, viewMode, itemCount, activePhotoId]);
+  }, [isAutoPlaying, viewMode, itemCount, activePhotoId, isEditingModalOpen]);
 
   useEffect(() => {
-    if (!activePhotoId || itemCount === 0) return;
+    if (!activePhotoId || isEditingModalOpen || itemCount === 0) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setActivePhotoId(null);
@@ -153,7 +164,7 @@ export default function Gallery({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePhotoId, itemCount, orderedItems]);
+  }, [activePhotoId, isEditingModalOpen, itemCount, orderedItems]);
 
   const goToNextSlide = () => {
     if (itemCount <= 1) return;
@@ -249,6 +260,45 @@ export default function Gallery({
     setSlideIndex(0);
   };
 
+  const handleOpenEditPhoto = (item: GalleryItem) => {
+    if (!isAdmin) {
+      onRequestAdminLogin();
+      return;
+    }
+    setEditingItem(item);
+  };
+
+  const handleSaveEditedPhoto = async (patch: {
+    title: string;
+    category: GalleryItem['category'];
+    caption: string;
+    date: string;
+  }): Promise<boolean> => {
+    if (!isAdmin || !editingItem) {
+      onRequestAdminLogin();
+      return false;
+    }
+    const result = await updateGalleryItem(editingItem, patch);
+    if (!result.syncedToCloud) {
+      return false;
+    }
+    setSuccessMessage(
+      `Keterangan foto "${patch.title}" berhasil diperbarui. Tersinkronisasi ke semua device.`
+    );
+    setEditingItem(null);
+    return true;
+  };
+
+  const handleSelectPhotoFromDropdown = (selectedId: string) => {
+    if (!selectedId) return;
+    const idx = orderedItems.findIndex((item) => item.id === selectedId);
+    if (idx < 0) return;
+    handleSelectSlide(idx);
+    if (viewMode === 'grid') {
+      setActivePhotoId(selectedId);
+    }
+  };
+
   const filterCategories = [
     'Semua',
     ...(customItems.length > 0 ? ['Foto Baru'] : []),
@@ -277,35 +327,54 @@ export default function Gallery({
           </p>
         </div>
 
-        {/* Category Filters + Date Filter + View Switcher + Upload Galeri CTA */}
+        {/* Dropdown Controls (Kategori, Tanggal, Pilih Foto) + View Switcher + Upload Galeri CTA */}
         <div className="flex flex-col gap-3.5 sm:gap-4 mb-6 sm:mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 sm:pb-0 flex-nowrap sm:flex-wrap w-full lg:w-auto">
-              {filterCategories.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => handleFilterChange(cat)}
-                  className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                    filter === cat
-                      ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 font-bold shadow-md'
-                      : 'glass-card text-slate-300 hover:text-white hover:bg-white/10 border border-white/10'
-                  }`}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Category Filter Dropdown */}
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="gallery-category-select"
+                className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Filter className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Kategori Galeri:</span>
+              </label>
+              <div className="relative">
+                <select
+                  id="gallery-category-select"
+                  value={filter}
+                  onChange={(e) => handleFilterChange(e.target.value)}
+                  className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
                 >
-                  {cat === 'Foto Baru' ? `Foto Baru (${customItems.length})` : cat}
-                </button>
-              ))}
+                  {filterCategories.map((cat) => (
+                    <option key={cat} value={cat} className="bg-[#0a0f24] text-white">
+                      {cat === 'Semua'
+                        ? 'Semua Kategori'
+                        : cat === 'Foto Baru'
+                          ? `Foto Baru (${customItems.length})`
+                          : cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full lg:w-auto">
-              {/* Date Filter Dropdown */}
-              <div className="relative flex-1 sm:flex-initial sm:w-56">
-                <CalendarDays className="w-3.5 h-3.5 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* Date Filter Dropdown */}
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="gallery-date-select"
+                className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Tanggal:</span>
+              </label>
+              <div className="relative">
                 <select
-                  aria-label="Filter tanggal galeri"
+                  id="gallery-date-select"
                   value={dateFilter}
                   onChange={(e) => handleDateFilterChange(e.target.value)}
-                  className="w-full min-h-[44px] appearance-none pl-9 pr-9 py-2 text-xs font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                  className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
                 >
                   <option value="Semua" className="bg-[#0a0f24] text-white">
                     Semua Tanggal
@@ -318,7 +387,59 @@ export default function Gallery({
                 </select>
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
+            </div>
 
+            {/* Direct Photo Selector Dropdown */}
+            <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+              <label
+                htmlFor="gallery-photo-select"
+                className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap"
+              >
+                <Images className="w-3.5 h-3.5 text-sky-400" />
+                <span>Pilih Foto:</span>
+              </label>
+              <div className="relative">
+                <select
+                  id="gallery-photo-select"
+                  value={
+                    itemCount > 0 && viewMode === 'slider' && activeSlideItem
+                      ? activeSlideItem.id
+                      : ''
+                  }
+                  disabled={itemCount === 0}
+                  onChange={(e) => handleSelectPhotoFromDropdown(e.target.value)}
+                  className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {itemCount === 0 ? (
+                    <option value="" className="bg-[#0a0f24] text-slate-400">
+                      Tidak ada foto tersedia
+                    </option>
+                  ) : (
+                    <>
+                      {viewMode === 'grid' && (
+                        <option value="" className="bg-[#0a0f24] text-slate-300">
+                          Pilih foto untuk dibuka ({itemCount} foto)...
+                        </option>
+                      )}
+                      {orderedItems.map((item, idx) => (
+                        <option key={item.id} value={item.id} className="bg-[#0a0f24] text-white">
+                          {String(idx + 1).padStart(2, '0')} · {item.title} ({item.category})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <p className="text-xs text-slate-400 tabular-nums">
+              Menampilkan <span className="font-semibold text-slate-200">{itemCount}</span> foto dokumentasi
+            </p>
+
+            <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
               {/* View Mode Toggle: Slider / Grid */}
               <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
                 <button
@@ -472,6 +593,22 @@ export default function Gallery({
                         ) : (
                           <Play className="w-4 h-4 text-emerald-300" />
                         )}
+                      </button>
+                    )}
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditPhoto(activeSlideItem);
+                        }}
+                        aria-label={`Edit keterangan foto ${activeSlideItem.title}`}
+                        title="Edit keterangan foto"
+                        className="min-h-[44px] px-3 sm:px-3.5 rounded-xl bg-black/55 hover:bg-cyan-500/80 hover:text-slate-950 backdrop-blur-md border border-white/20 flex items-center justify-center gap-1.5 text-xs font-semibold text-white transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-4 h-4 shrink-0" />
+                        <span className="hidden sm:inline">Edit Keterangan</span>
                       </button>
                     )}
 
@@ -657,8 +794,22 @@ export default function Gallery({
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#070913] via-[#070913]/30 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
 
-                      {/* Top Right Actions: Delete (Custom + Admin) & Expand */}
+                      {/* Top Right Actions: Edit (Admin), Delete (Custom + Admin) & Expand */}
                       <div className="absolute top-4 right-4 flex items-center gap-2">
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditPhoto(item);
+                            }}
+                            aria-label={`Edit keterangan foto ${item.title}`}
+                            title="Edit keterangan foto"
+                            className="w-11 h-11 rounded-xl bg-black/60 hover:bg-cyan-500/85 hover:text-slate-950 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                         {isAdmin && item.isCustom && (
                           <button
                             type="button"
@@ -777,7 +928,7 @@ export default function Gallery({
             </div>
 
             <div className="p-4 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-cyan-300">
                     {activeLightboxPhoto.category}
@@ -785,9 +936,21 @@ export default function Gallery({
                   <span className="text-slate-500" aria-hidden="true">·</span>
                   <span className="text-slate-400">{activeLightboxPhoto.date}</span>
                 </div>
-                <span className="text-slate-400 tabular-nums">
-                  {lightboxIndex + 1} / {itemCount}
-                </span>
+                <div className="flex items-center gap-3">
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditPhoto(activeLightboxPhoto)}
+                      className="min-h-[38px] px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 text-xs font-semibold text-cyan-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit Keterangan</span>
+                    </button>
+                  )}
+                  <span className="text-slate-400 tabular-nums">
+                    {lightboxIndex + 1} / {itemCount}
+                  </span>
+                </div>
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-white">
                 {activeLightboxPhoto.title}
@@ -798,6 +961,15 @@ export default function Gallery({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Admin Edit Gallery Modal */}
+      {isAdmin && editingItem && (
+        <GalleryEditModal
+          item={editingItem}
+          onSave={handleSaveEditedPhoto}
+          onClose={() => setEditingItem(null)}
+        />
       )}
     </section>
   );

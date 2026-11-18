@@ -4,9 +4,11 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
@@ -334,6 +336,7 @@ export function useTournamentSync() {
 
 export function useGallerySync() {
   const [cloudItems, setCloudItems] = useState<GalleryItem[]>([]);
+  const [defaultOverrides, setDefaultOverrides] = useState<Record<string, GalleryItem>>({});
 
   const pendingGalleryJson = useSyncExternalStore(
     subscribeStorage(PENDING_GALLERY_EVENT),
@@ -348,26 +351,38 @@ export function useGallerySync() {
     const unsubGallery = onSnapshot(
       collection(db, 'gallery_items'),
       (snapshot) => {
-        const items = snapshot.docs
-          .map((d) => {
-            const data = d.data() as Record<string, unknown>;
-            return {
-              item: {
-                id: d.id,
-                title: String(data.title || ''),
-                category: data.category as GalleryItem['category'],
-                imageUrl: String(data.imageUrl || ''),
-                caption: String(data.caption || ''),
-                date: String(data.date || 'SOR RW 017'),
-                isCustom: true,
-              } satisfies GalleryItem,
-              createdAt: Number(data.createdAt || 0),
-            };
-          })
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .map((entry) => entry.item);
+        const nextCustom: { item: GalleryItem; createdAt: number }[] = [];
+        const nextOverrides: Record<string, GalleryItem> = {};
 
-        setCloudItems(items);
+        snapshot.docs.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const isCustomFlag = data.isCustom !== false;
+          const mappedItem: GalleryItem = {
+            id: d.id,
+            title: String(data.title || ''),
+            category: data.category as GalleryItem['category'],
+            imageUrl: String(data.imageUrl || ''),
+            caption: String(data.caption || ''),
+            date: String(data.date || 'SOR RW 017'),
+            isCustom: isCustomFlag,
+          };
+
+          if (isCustomFlag) {
+            nextCustom.push({
+              item: mappedItem,
+              createdAt: Number(data.createdAt || 0),
+            });
+          } else {
+            nextOverrides[d.id] = mappedItem;
+          }
+        });
+
+        setCloudItems(
+          nextCustom
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .map((entry) => entry.item)
+        );
+        setDefaultOverrides(nextOverrides);
       },
       (error) => {
         const errInfo = buildFirestoreErrorInfo(
@@ -401,7 +416,7 @@ export function useGallerySync() {
     return combined;
   }, [cloudItems, pendingGalleryJson]);
 
-  return { customItems };
+  return { customItems, defaultOverrides };
 }
 
 export async function saveCustomMatch(match: MatchItem): Promise<CloudWriteResult> {
@@ -555,6 +570,99 @@ export async function saveGalleryItems(newItems: GalleryItem[]): Promise<CloudWr
         syncedToCloud: false,
         errorMessage:
           wrapped instanceof Error ? wrapped.message : 'Gagal mengunggah foto ke cloud.',
+      };
+    }
+  }
+}
+
+export async function updateGalleryItem(
+  item: GalleryItem,
+  patch: {
+    title: string;
+    category: GalleryItem['category'];
+    caption: string;
+    date: string;
+  }
+): Promise<CloudWriteResult> {
+  const cleanId = String(item.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+  const cleanTitle = String(patch.title || '').trim().slice(0, 160);
+  const cleanCaption = String(patch.caption || '').trim().slice(0, 500);
+  const cleanDate =
+    String(patch.date || '').trim().slice(0, 80) ||
+    String(item.date || 'SOR RW 017').slice(0, 80);
+  const allowedCategories: GalleryItem['category'][] = [
+    'Bulutangkis',
+    'Bola Voli',
+    'Tenis Meja',
+    'Futsal Anak',
+    'Seremoni',
+  ];
+  const cleanCategory = allowedCategories.includes(patch.category)
+    ? patch.category
+    : item.category;
+
+  if (!cleanId || !cleanTitle) {
+    return {
+      syncedToCloud: false,
+      errorMessage: 'Judul foto tidak boleh kosong.',
+    };
+  }
+
+  const docPath = `gallery_items/${cleanId}`;
+  const docRef = doc(db, 'gallery_items', cleanId);
+
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await updateDoc(docRef, {
+        title: cleanTitle,
+        category: cleanCategory,
+        caption: cleanCaption,
+        date: cleanDate,
+      });
+    } else {
+      await setDoc(docRef, {
+        id: cleanId,
+        title: cleanTitle,
+        category: cleanCategory,
+        imageUrl: String(item.imageUrl || '').slice(0, 900000),
+        caption: cleanCaption,
+        date: cleanDate,
+        isCustom: Boolean(item.isCustom),
+        createdAt: item.isCustom ? Date.now() : 0,
+      });
+    }
+
+    const current = readStorageJson<GalleryItem[]>(PENDING_GALLERY_KEY, []);
+    if (current.some((entry) => entry.id === cleanId)) {
+      writeStorageRaw(
+        PENDING_GALLERY_KEY,
+        PENDING_GALLERY_EVENT,
+        current.map((entry) =>
+          entry.id === cleanId
+            ? {
+                ...entry,
+                title: cleanTitle,
+                category: cleanCategory,
+                caption: cleanCaption,
+                date: cleanDate,
+              }
+            : entry
+        )
+      );
+    }
+
+    return { syncedToCloud: true };
+  } catch (error) {
+    try {
+      handleFirestoreError(error, OperationType.UPDATE, docPath);
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error
+            ? wrapped.message
+            : 'Gagal memperbarui keterangan foto di cloud.',
       };
     }
   }
