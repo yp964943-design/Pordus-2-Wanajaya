@@ -13,8 +13,6 @@ import {
   ChevronRight,
   Play,
   Pause,
-  LayoutGrid,
-  GalleryHorizontalEnd,
   CalendarDays,
   ChevronDown,
   Pencil,
@@ -46,7 +44,6 @@ export default function Gallery({
 }: GalleryProps) {
   const [filter, setFilter] = useState<string>('Semua');
   const [dateFilter, setDateFilter] = useState<string>('Semua');
-  const [viewMode, setViewMode] = useState<'slider' | 'grid'>('slider');
   const [slideIndex, setSlideIndex] = useState<number>(0);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
@@ -123,6 +120,33 @@ export default function Gallery({
     return { groupedAlbums: albums, orderedItems: flattened };
   }, [allItems, filter, dateFilter]);
 
+  const GROUPS_PER_PAGE = 5;
+  const [currentAlbumPage, setCurrentAlbumPage] = useState<number>(1);
+
+  const isFilteredView = filter !== 'Semua' || dateFilter !== 'Semua';
+  const totalAlbumPages = isFilteredView
+    ? 1
+    : Math.max(1, Math.ceil(groupedAlbums.length / GROUPS_PER_PAGE));
+  const safeAlbumPage = isFilteredView
+    ? 1
+    : Math.min(Math.max(1, currentAlbumPage), totalAlbumPages);
+
+  const visibleAlbums = useMemo(() => {
+    if (isFilteredView) return groupedAlbums;
+    const start = (safeAlbumPage - 1) * GROUPS_PER_PAGE;
+    return groupedAlbums.slice(start, start + GROUPS_PER_PAGE);
+  }, [groupedAlbums, isFilteredView, safeAlbumPage]);
+
+  const visibleSlideIndices = useMemo(() => {
+    const indices: number[] = [];
+    visibleAlbums.forEach((album) => {
+      for (let i = 0; i < album.items.length; i += 1) {
+        indices.push(album.startIndex + i);
+      }
+    });
+    return indices;
+  }, [visibleAlbums]);
+
   const itemCount = orderedItems.length;
   const safeIndex = itemCount > 0 ? ((slideIndex % itemCount) + itemCount) % itemCount : 0;
   const activeSlideItem = itemCount > 0 ? orderedItems[safeIndex] : null;
@@ -135,15 +159,24 @@ export default function Gallery({
   const isEditingModalOpen = editingItem !== null;
 
   useEffect(() => {
-    if (!isAutoPlaying || viewMode !== 'slider' || itemCount <= 1 || activePhotoId || isEditingModalOpen) {
+    if (
+      !isAutoPlaying ||
+      visibleSlideIndices.length <= 1 ||
+      activePhotoId ||
+      isEditingModalOpen
+    ) {
       return;
     }
     const timer = window.setInterval(() => {
       setSlideDirection(1);
-      setSlideIndex((prev) => (prev + 1) % itemCount);
+      setSlideIndex((prev) => {
+        const currentPos = visibleSlideIndices.indexOf(prev);
+        if (currentPos < 0) return visibleSlideIndices[0];
+        return visibleSlideIndices[(currentPos + 1) % visibleSlideIndices.length];
+      });
     }, 4500);
     return () => window.clearInterval(timer);
-  }, [isAutoPlaying, viewMode, itemCount, activePhotoId, isEditingModalOpen]);
+  }, [isAutoPlaying, visibleSlideIndices, activePhotoId, isEditingModalOpen]);
 
   useEffect(() => {
     if (!activePhotoId || isEditingModalOpen || itemCount === 0) return;
@@ -168,31 +201,60 @@ export default function Gallery({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activePhotoId, isEditingModalOpen, itemCount, orderedItems]);
 
+  const syncPageForGlobalIndex = (targetIdx: number) => {
+    if (isFilteredView || groupedAlbums.length === 0) return;
+    const albumIdx = groupedAlbums.findIndex(
+      (album) =>
+        targetIdx >= album.startIndex &&
+        targetIdx < album.startIndex + album.items.length
+    );
+    if (albumIdx >= 0) {
+      setCurrentAlbumPage(Math.floor(albumIdx / GROUPS_PER_PAGE) + 1);
+    }
+  };
+
   const goToNextSlide = () => {
     if (itemCount <= 1) return;
+    const nextIdx = (safeIndex + 1) % itemCount;
     setSlideDirection(1);
-    setSlideIndex((prev) => (prev + 1) % itemCount);
+    setSlideIndex(nextIdx);
+    syncPageForGlobalIndex(nextIdx);
   };
 
   const goToPrevSlide = () => {
     if (itemCount <= 1) return;
+    const prevIdx = (safeIndex - 1 + itemCount) % itemCount;
     setSlideDirection(-1);
-    setSlideIndex((prev) => (prev - 1 + itemCount) % itemCount);
+    setSlideIndex(prevIdx);
+    syncPageForGlobalIndex(prevIdx);
   };
 
   const handleSelectSlide = (targetIdx: number) => {
     setSlideDirection(targetIdx >= safeIndex ? 1 : -1);
     setSlideIndex(targetIdx);
+    syncPageForGlobalIndex(targetIdx);
+  };
+
+  const handleAlbumPageChange = (nextPage: number) => {
+    const clamped = Math.min(Math.max(1, nextPage), totalAlbumPages);
+    setCurrentAlbumPage(clamped);
+    const firstAlbumOnPage = groupedAlbums[(clamped - 1) * GROUPS_PER_PAGE];
+    if (firstAlbumOnPage) {
+      setSlideDirection(clamped >= safeAlbumPage ? 1 : -1);
+      setSlideIndex(firstAlbumOnPage.startIndex);
+    }
   };
 
   const handleFilterChange = (nextFilter: string) => {
     setFilter(nextFilter);
+    setCurrentAlbumPage(1);
     setSlideDirection(1);
     setSlideIndex(0);
   };
 
   const handleDateFilterChange = (nextDate: string) => {
     setDateFilter(nextDate);
+    setCurrentAlbumPage(1);
     setSlideDirection(1);
     setSlideIndex(0);
   };
@@ -234,7 +296,6 @@ export default function Gallery({
     }
     setFilter('Foto Baru');
     setDateFilter('Semua');
-    setViewMode('slider');
     setSlideDirection(1);
     setSlideIndex(0);
     onToggleUpload(false);
@@ -296,9 +357,6 @@ export default function Gallery({
     const idx = orderedItems.findIndex((item) => item.id === selectedId);
     if (idx < 0) return;
     handleSelectSlide(idx);
-    if (viewMode === 'grid') {
-      setActivePhotoId(selectedId);
-    }
   };
 
   const filterCategories = [
@@ -403,11 +461,7 @@ export default function Gallery({
               <div className="relative">
                 <select
                   id="gallery-photo-select"
-                  value={
-                    itemCount > 0 && viewMode === 'slider' && activeSlideItem
-                      ? activeSlideItem.id
-                      : ''
-                  }
+                  value={itemCount > 0 && activeSlideItem ? activeSlideItem.id : ''}
                   disabled={itemCount === 0}
                   onChange={(e) => handleSelectPhotoFromDropdown(e.target.value)}
                   className="w-full min-h-[44px] appearance-none pl-4 pr-10 py-2 text-xs sm:text-sm font-medium rounded-xl glass-input bg-[#0a0f24] text-slate-100 border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -418,11 +472,6 @@ export default function Gallery({
                     </option>
                   ) : (
                     <>
-                      {viewMode === 'grid' && (
-                        <option value="" className="bg-[#0a0f24] text-slate-300">
-                          Pilih foto untuk dibuka ({itemCount} foto)...
-                        </option>
-                      )}
                       {groupedAlbums.map((album) => (
                         <optgroup
                           key={album.key}
@@ -456,36 +505,8 @@ export default function Gallery({
               Menampilkan <span className="font-semibold text-slate-200">{itemCount}</span> foto dokumentasi
             </p>
 
-            <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
-              {/* View Mode Toggle: Slider / Grid */}
-              <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('slider')}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                    viewMode === 'slider'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <GalleryHorizontalEnd className="w-3.5 h-3.5" />
-                  <span>Slider</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                    viewMode === 'grid'
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/35'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>Grid</span>
-                </button>
-              </div>
-
-              {isAdmin && (
+            {isAdmin && (
+              <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => onToggleUpload(!isUploadOpen)}
@@ -498,8 +519,8 @@ export default function Gallery({
                   <Upload className="w-4 h-4" />
                   <span>{isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -545,7 +566,7 @@ export default function Gallery({
           <div className="glass-card rounded-3xl border border-white/15 p-10 text-center text-sm text-slate-400">
             Belum ada foto untuk kombinasi cabang olahraga dan tanggal tersebut.
           </div>
-        ) : viewMode === 'slider' && activeSlideItem ? (
+        ) : activeSlideItem ? (
           /* SLIDER VIEW */
           <div className="space-y-5">
             {/* Main Stage Slider with Mobile Touch Swipe */}
@@ -704,21 +725,23 @@ export default function Gallery({
               </div>
             </div>
 
-            {/* Combined Photos Grouped by Cabor & Tanggal */}
-            {groupedAlbums.length > 0 && (
+            {/* Combined Photos Grouped by Cabor & Tanggal (Paginated 5 groups/page unless filtered) */}
+            {visibleAlbums.length > 0 && (
               <div className="space-y-3.5">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
                     <Images className="w-4 h-4 text-cyan-400 shrink-0" />
                     <span>Foto Digabungkan per Cabor & Tanggal</span>
                   </h4>
                   <span className="text-[11px] sm:text-xs text-slate-400 tabular-nums">
-                    {groupedAlbums.length} Grup · {itemCount} Foto
+                    {isFilteredView || totalAlbumPages <= 1
+                      ? `${groupedAlbums.length} Kelompok · ${itemCount} Foto`
+                      : `Menampilkan ${visibleAlbums.length} dari ${groupedAlbums.length} Kelompok · ${itemCount} Foto`}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {groupedAlbums.map((album) => {
+                  {visibleAlbums.map((album) => {
                     const isActiveAlbum =
                       activeSlideItem.category.trim() === album.category &&
                       activeSlideItem.date.trim() === album.date;
@@ -794,109 +817,67 @@ export default function Gallery({
                     );
                   })}
                 </div>
+
+                {!isFilteredView && totalAlbumPages > 1 && (
+                  <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
+                    <p className="text-xs text-slate-400 tabular-nums">
+                      Halaman <span className="font-semibold text-slate-200">{safeAlbumPage}/{totalAlbumPages}</span>
+                      {' · '}
+                      <span>5 kelompok per halaman</span>
+                    </p>
+                    <nav
+                      aria-label="Pagination kelompok galeri slider"
+                      className="flex flex-wrap items-center gap-1"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleAlbumPageChange(safeAlbumPage - 1)}
+                        disabled={safeAlbumPage <= 1}
+                        aria-label="Halaman sebelumnya"
+                        title="Halaman sebelumnya"
+                        className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      {Array.from({ length: totalAlbumPages }, (_, idx) => {
+                        const pageNum = idx + 1;
+                        const isCurrent = pageNum === safeAlbumPage;
+                        return (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => handleAlbumPageChange(pageNum)}
+                            aria-current={isCurrent ? 'page' : undefined}
+                            aria-label={`Halaman ${pageNum}`}
+                            className={`min-h-[40px] min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
+                              isCurrent
+                                ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
+                                : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={() => handleAlbumPageChange(safeAlbumPage + 1)}
+                        disabled={safeAlbumPage >= totalAlbumPages}
+                        aria-label="Halaman berikutnya"
+                        title="Halaman berikutnya"
+                        className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </nav>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        ) : (
-          /* GROUPED GRID VIEW (Cabang Olahraga & Tanggal) */
-          <div className="space-y-6">
-            {groupedAlbums.map((album) => (
-              <div
-                key={album.key}
-                className="glass-card rounded-3xl border border-white/12 p-4 sm:p-6 space-y-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                    <span className="text-sm sm:text-base font-extrabold text-cyan-300">
-                      {album.category}
-                    </span>
-                    <span className="text-slate-500" aria-hidden="true">·</span>
-                    <span className="text-sm sm:text-base font-bold text-white flex items-center gap-1.5">
-                      <CalendarDays className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{album.date}</span>
-                    </span>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-cyan-300 tabular-nums">
-                    {album.items.length} Foto
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {album.items.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      onClick={() => setActivePhotoId(item.id)}
-                      className={`group glass-card rounded-3xl overflow-hidden border border-white/15 cursor-pointer relative ${
-                        album.items.length > 1 && idx === 0
-                          ? 'sm:col-span-2 aspect-[16/9]'
-                          : 'aspect-[4/3]'
-                      }`}
-                    >
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#070913] via-[#070913]/30 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-
-                      {/* Top Right Actions: Edit (Admin), Delete (Custom + Admin) & Expand */}
-                      <div className="absolute top-4 right-4 flex items-center gap-2">
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditPhoto(item);
-                            }}
-                            aria-label={`Edit keterangan foto ${item.title}`}
-                            title="Edit keterangan foto"
-                            className="w-11 h-11 rounded-xl bg-black/60 hover:bg-cyan-500/85 hover:text-slate-950 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
-                        {isAdmin && item.isCustom && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleDeleteCustomPhoto(item.id);
-                            }}
-                            aria-label={`Hapus foto ${item.title}`}
-                            title="Hapus foto unggahan"
-                            className="w-11 h-11 rounded-xl bg-black/60 hover:bg-rose-500/80 backdrop-blur-md border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                        <div className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md border border-white/20 flex items-center justify-center text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <Maximize2 className="w-4 h-4" />
-                        </div>
-                      </div>
-
-                      {/* Caption & Unboxed Metadata */}
-                      <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold text-cyan-300 mb-1">
-                          <span>{item.category}</span>
-                          <span className="text-slate-500" aria-hidden="true">·</span>
-                          <span className="text-slate-300 font-normal">{item.date}</span>
-                        </div>
-                        <h4 className="text-base sm:text-lg font-bold text-white tracking-tight drop-shadow-md">
-                          {item.title}
-                        </h4>
-                        <p className="text-xs text-slate-300 mt-1 line-clamp-1">
-                          {item.caption}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ) : null}
 
       </div>
 
