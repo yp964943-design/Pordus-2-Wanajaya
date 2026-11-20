@@ -229,6 +229,238 @@ function groupMatchesForStandings(
     }));
 }
 
+const EXHIBITION_SPORTS = new Set<MatchItem['sport']>(['Futsal Anak']);
+
+function buildMedalStandings(matches: MatchItem[]): RWStanding[] {
+  const medalMap = new Map<string, RWStanding>();
+
+  INITIAL_STANDINGS.forEach((item) => {
+    medalMap.set(item.rw, {
+      ...item,
+      gold: 0,
+      silver: 0,
+      bronze: 0,
+      points: 0,
+    });
+  });
+
+  const ensureRw = (team: MatchItem['teamA']) => {
+    if (!medalMap.has(team.rw)) {
+      medalMap.set(team.rw, {
+        rw: team.rw,
+        rwName: team.name || RW_LOGOS[team.rw]?.name || 'Dusun II Wanajaya',
+        logo: team.logo || RW_LOGOS[team.rw]?.logo,
+        gold: 0,
+        silver: 0,
+        bronze: 0,
+        points: 0,
+      });
+    }
+    return medalMap.get(team.rw)!;
+  };
+
+  const awardMedal = (rwCode: string, medal: 'gold' | 'silver' | 'bronze', team?: MatchItem['teamA']) => {
+    if (!rwCode) return;
+    const target = ensureRw(team ?? { rw: rwCode });
+    target[medal] += 1;
+    target.points = target.gold * 5 + target.silver * 3 + target.bronze * 1;
+  };
+
+  // Only official sports count toward RW medal standings; exhibition sports (e.g. Futsal Anak) are excluded.
+  const officialMatches = matches.filter((m) => !EXHIBITION_SPORTS.has(m.sport));
+
+  officialMatches.forEach((m) => {
+    if (m.status !== 'Selesai') return;
+    const { scoreA, scoreB } = getMatchSetScores(m);
+    const resolvedWinner =
+      m.winner ||
+      (scoreA > scoreB ? m.teamA.rw : scoreB > scoreA ? m.teamB.rw : '');
+    if (!resolvedWinner) return;
+
+    if (m.round === 'Final') {
+      const runnerUpTeam = resolvedWinner === m.teamA.rw ? m.teamB : m.teamA;
+      const winnerTeam = resolvedWinner === m.teamA.rw ? m.teamA : m.teamB;
+      awardMedal(resolvedWinner, 'gold', winnerTeam);
+      awardMedal(runnerUpTeam.rw, 'silver', runnerUpTeam);
+    } else if (m.round === 'Perebutan Juara 3') {
+      const bronzeTeam = resolvedWinner === m.teamA.rw ? m.teamA : m.teamB;
+      awardMedal(resolvedWinner, 'bronze', bronzeTeam);
+    }
+  });
+
+  // Official round-robin sport without a final (Bola Voli Putri): award medals once all scheduled matches finish
+  const voliPutriMatches = officialMatches.filter(
+    (m) => m.sport === 'Bola Voli' && m.category === 'Putri'
+  );
+  const hasVoliPutriFinal = voliPutriMatches.some((m) => m.round === 'Final');
+  if (
+    !hasVoliPutriFinal &&
+    voliPutriMatches.length > 0 &&
+    voliPutriMatches.every((m) => m.status === 'Selesai')
+  ) {
+    const voliPutriRows = buildSportStandings(voliPutriMatches);
+    if (voliPutriRows[0]) awardMedal(voliPutriRows[0].rw, 'gold');
+    if (voliPutriRows[1]) awardMedal(voliPutriRows[1].rw, 'silver');
+    if (voliPutriRows[2]) awardMedal(voliPutriRows[2].rw, 'bronze');
+  }
+
+  return Array.from(medalMap.values()).sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.gold - a.gold ||
+      b.silver - a.silver ||
+      b.bronze - a.bronze ||
+      a.rw.localeCompare(b.rw)
+  );
+}
+
+interface FutsalTopScorerRow {
+  key: string;
+  playerName: string;
+  rw: string;
+  logo?: string;
+  goals: number;
+  matchesCount: number;
+}
+
+function buildFutsalTopScorers(matches: MatchItem[]): FutsalTopScorerRow[] {
+  const map = new Map<string, FutsalTopScorerRow & { matchIds: Set<string> }>();
+
+  matches.forEach((m) => {
+    if (!m.futsalGoalScorers || m.futsalGoalScorers.length === 0) return;
+    m.futsalGoalScorers.forEach((scorer) => {
+      const cleanName = scorer.playerName?.trim();
+      const goals = Number(scorer.goals) || 0;
+      if (!cleanName || goals <= 0) return;
+
+      const team = scorer.team === 'B' ? m.teamB : m.teamA;
+      const rw = team.rw || (scorer.team === 'B' ? 'Tim B' : 'Tim A');
+      const logo = team.logo || RW_LOGOS[rw]?.logo;
+      const normalizedKey = `${rw.toLowerCase()}::${cleanName.toLowerCase()}`;
+
+      const existing = map.get(normalizedKey);
+      if (existing) {
+        existing.goals += goals;
+        existing.matchIds.add(m.id);
+        existing.matchesCount = existing.matchIds.size;
+      } else {
+        map.set(normalizedKey, {
+          key: normalizedKey,
+          playerName: cleanName,
+          rw,
+          logo,
+          goals,
+          matchesCount: 1,
+          matchIds: new Set([m.id]),
+        });
+      }
+    });
+  });
+
+  return Array.from(map.values())
+    .map(({ matchIds: _matchIds, ...row }) => row)
+    .sort(
+      (a, b) =>
+        b.goals - a.goals ||
+        a.rw.localeCompare(b.rw) ||
+        a.playerName.localeCompare(b.playerName)
+    );
+}
+
+function FutsalTopScorersCard({ scorers }: { scorers: FutsalTopScorerRow[] }) {
+  const totalGoals = scorers.reduce((sum, item) => sum + item.goals, 0);
+
+  return (
+    <div className="pt-4 border-t border-white/10 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+          <h6 className="text-xs sm:text-sm font-bold text-white">
+            Daftar Pencetak Gol (Top Skor)
+          </h6>
+        </div>
+        {scorers.length > 0 && (
+          <span className="text-[11px] text-emerald-300 font-semibold tabular-nums">
+            {scorers.length} Pemain · {totalGoals} Gol
+          </span>
+        )}
+      </div>
+
+      {scorers.length === 0 ? (
+        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/10 text-xs text-slate-400">
+          Belum ada pencetak gol tercatat. Daftar top skor akan otomatis muncul saat hasil pertandingan Futsal Anak diinput.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-white/10 overflow-hidden bg-white/[0.02]">
+          <div className="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_auto] items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10 text-[11px] font-semibold uppercase text-slate-400">
+            <span className="text-center">#</span>
+            <span>Pemain &amp; Kontingen RW</span>
+            <span className="text-right">Gol</span>
+          </div>
+          <div className="divide-y divide-white/5">
+            {scorers.map((scorer, idx) => (
+              <div
+                key={scorer.key}
+                className={`grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_auto] items-center gap-2 px-3 py-2.5 text-xs ${
+                  idx === 0 ? 'bg-amber-500/[0.06]' : ''
+                }`}
+              >
+                <div className="flex items-center justify-center tabular-nums">
+                  {idx === 0 ? (
+                    <span className="w-6 h-6 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center justify-center font-extrabold text-[11px]">
+                      1
+                    </span>
+                  ) : idx === 1 ? (
+                    <span className="w-6 h-6 rounded-full bg-slate-400/20 text-slate-200 border border-slate-400/40 flex items-center justify-center font-extrabold text-[11px]">
+                      2
+                    </span>
+                  ) : idx === 2 ? (
+                    <span className="w-6 h-6 rounded-full bg-amber-700/20 text-amber-500 border border-amber-700/40 flex items-center justify-center font-extrabold text-[11px]">
+                      3
+                    </span>
+                  ) : (
+                    <span className="font-bold text-slate-400">{idx + 1}</span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex items-center gap-2.5">
+                  {scorer.logo ? (
+                    <div className="w-6 h-6 rounded bg-white p-0.5 border border-white/20 shrink-0 overflow-hidden">
+                      <RwLogoImage
+                        src={scorer.logo}
+                        alt={`Logo ${scorer.rw}`}
+                        size={24}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-white truncate">{scorer.playerName}</p>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {scorer.rw}
+                      {scorer.matchesCount > 1 ? ` · ${scorer.matchesCount} laga` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right tabular-nums shrink-0">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/30 font-extrabold text-emerald-300 text-xs">
+                    {scorer.goals} Gol
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StandingsTable({
   rows,
   showDraw = false,
@@ -368,7 +600,6 @@ export default function HubSection({
   const [dateFilter, setDateFilter] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentDatePage, setCurrentDatePage] = useState<number>(1);
-  const [standings] = useState<RWStanding[]>(INITIAL_STANDINGS);
   const [selectedMatchForResult, setSelectedMatchForResult] = useState<string | undefined>(undefined);
   const [selectedMatchForEdit, setSelectedMatchForEdit] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -419,6 +650,11 @@ export default function HubSection({
       })
       .sort(compareMatchesByDateTime);
   }, [customMatches, defaultMatchOverrides, resultOverrides]);
+
+  const standings = useMemo<RWStanding[]>(
+    () => buildMedalStandings(allMatches),
+    [allMatches]
+  );
 
   const handleAddMatch = async (newMatch: MatchItem) => {
     if (!isAdmin) {
@@ -1449,6 +1685,7 @@ export default function HubSection({
               futsalAnakMatches.length > 0
                 ? buildSportStandings(futsalAnakMatches)
                 : buildSportStandings([], true);
+            const futsalTopScorers = buildFutsalTopScorers(futsalAnakMatches);
 
             const klasemenFilterOptions = [
               'Semua',
@@ -1595,15 +1832,21 @@ export default function HubSection({
 
                         {showSport('Futsal Anak') && (
                           <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <h5 className="text-sm sm:text-base font-bold text-emerald-300">
-                                Klasemen Futsal Anak
-                              </h5>
-                              <span className="text-[11px] text-amber-300 font-semibold">
-                                Sistem Bertemu
-                              </span>
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h5 className="text-sm sm:text-base font-bold text-emerald-300">
+                                  Klasemen Futsal Anak
+                                </h5>
+                                <span className="text-[11px] text-amber-300 font-semibold">
+                                  Eksibisi · Sistem Bertemu
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400">
+                                Cabang eksibisi — juara tidak masuk hitungan perolehan medali antar RW.
+                              </p>
                             </div>
                             <StandingsTable rows={futsalRows} showDraw accent="emerald" />
+                            <FutsalTopScorersCard scorers={futsalTopScorers} />
                           </div>
                         )}
                       </div>
@@ -1618,11 +1861,11 @@ export default function HubSection({
                       <h4 className="text-lg font-bold text-white">
                         Klasemen Resmi Perolehan Medali Antar RW
                       </h4>
-                      <p className="text-xs text-slate-400">
-                        Sistem poin: Emas (5 poin), Perak (3 poin), Perunggu (1 poin)
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                        Sistem poin: Emas (5 poin), Perak (3 poin), Perunggu (1 poin) · Dihitung dari cabor resmi (Bulu Tangkis, Bola Voli, Tenis Meja). Juara Futsal Anak bersifat eksibisi dan tidak masuk hitungan medali.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-cyan-300">
+                    <div className="flex items-center gap-2 text-xs text-cyan-300 shrink-0">
                       <Trophy className="w-4 h-4 text-amber-400" />
                       <span>Kontingen Dusun II Wanajaya</span>
                     </div>
@@ -1721,6 +1964,7 @@ export default function HubSection({
             const futsalAnakMatches = allMatches.filter((m) => m.sport === 'Futsal Anak');
             const voliPutriStandings = buildSportStandings(voliPutriMatches);
             const futsalStandings = buildSportStandings(futsalAnakMatches);
+            const futsalTopScorers = buildFutsalTopScorers(futsalAnakMatches);
 
             return (
               <div className="space-y-10">
@@ -1876,13 +2120,13 @@ export default function HubSection({
                       Sistem Bertemu Penuh (Tanpa Babak Final)
                     </h4>
                     <p className="text-xs text-slate-400 mt-1">
-                      Bola Voli Putri dan Futsal Anak (U-12) tidak mempertandingkan babak final — peringkat juara ditentukan langsung dari klasemen poin akhir.
+                      Bola Voli Putri dan Futsal Anak (U-12) tidak mempertandingkan babak final — peringkat juara ditentukan langsung dari klasemen poin akhir. Khusus Futsal Anak bersifat eksibisi dan tidak masuk hitungan perolehan medali antar RW.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Bola Voli Putri */}
-                    <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                    <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
                       <div className="flex items-center justify-between gap-2">
                         <h5 className="text-sm font-bold text-cyan-300">
                           Bola Voli Putri · Klasemen Bertemu
@@ -1900,12 +2144,19 @@ export default function HubSection({
                     </div>
 
                     {/* Futsal Anak */}
-                    <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h5 className="text-sm font-bold text-emerald-300">
-                          Futsal Anak (U-12) · Klasemen Bertemu
-                        </h5>
-                        <span className="text-[11px] text-amber-300 font-semibold">Tanpa Final</span>
+                    <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h5 className="text-sm font-bold text-emerald-300">
+                            Futsal Anak (U-12) · Klasemen Bertemu
+                          </h5>
+                          <span className="text-[11px] text-amber-300 font-semibold">
+                            Eksibisi · Tanpa Medali
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Sifatnya eksibisi sehingga tidak dihitung dalam perolehan medali RW.
+                        </p>
                       </div>
 
                       {futsalStandings.length > 0 ? (
@@ -1915,6 +2166,7 @@ export default function HubSection({
                           Belum ada jadwal Futsal Anak yang ditambahkan. Admin dapat menambahkan jadwal pertandingan sistem bertemu melalui menu <span className="text-cyan-300 font-semibold">Input Jadwal</span>.
                         </div>
                       )}
+                      <FutsalTopScorersCard scorers={futsalTopScorers} />
                     </div>
                   </div>
                 </div>

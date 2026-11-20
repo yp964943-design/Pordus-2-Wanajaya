@@ -10,6 +10,7 @@ import RulesSection from '@/components/RulesSection';
 import Gallery from '@/components/Gallery';
 import VenueAndContact from '@/components/VenueAndContact';
 import CommentSection from '@/components/CommentSection';
+import CommitteeStructure from '@/components/CommitteeStructure';
 import SponsorSection from '@/components/SponsorSection';
 import Footer from '@/components/Footer';
 import AdminLoginModal from '@/components/AdminLoginModal';
@@ -140,7 +141,10 @@ export default function HomePage() {
         {/* Section 7: Komentar & Dukungan Warga */}
         <CommentSection isAdmin={isAdmin} />
 
-        {/* Section 8: Sponsor Resmi */}
+        {/* Section 8: Struktur Pengurus Komite Olahraga Dusun II */}
+        <CommitteeStructure />
+
+        {/* Section 9: Sponsor Resmi */}
         <SponsorSection />
       </main>
 

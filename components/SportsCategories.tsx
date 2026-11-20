@@ -26,7 +26,7 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
           </h2>
           <div className="w-16 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
           <p className="mt-3.5 sm:mt-4 text-sm sm:text-base text-slate-300">
-            Empat cabang olahraga utama yang memperebutkan medali dan supremasi bergengsi antar RW Dusun II Wanajaya.
+            Tiga cabang olahraga resmi perebutan medali antar RW (Bulu Tangkis, Bola Voli, Tenis Meja) serta cabang eksibisi Futsal Anak U-12.
           </p>
         </div>
 

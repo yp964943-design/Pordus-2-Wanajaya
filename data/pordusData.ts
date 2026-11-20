@@ -173,16 +173,17 @@ export const SPORTS_LIST: SportItem[] = [
   {
     id: 'futsal-anak',
     name: 'Futsal Anak',
-    category: 'Anak-Anak (U-12)',
-    description: 'Kompetisi futsal kelompok usia anak antar RW menggunakan sistem bertemu tanpa ada babak final untuk menyalurkan bakat sepak bola usia dini warga Dusun II.',
+    category: 'Eksibisi · U-12',
+    description: 'Kompetisi eksibisi futsal kelompok usia anak antar RW menggunakan sistem bertemu tanpa babak final untuk menyalurkan bakat usia dini (tidak masuk hitungan medali RW).',
     image: '/images/futsal_anak_pordus_1794727648397.jpg',
     rulesHighlight: [
-      'Menggunakan sistem bertemu (setiap tim saling bertemu) tanpa ada babak final; peringkat teratas klasemen menjadi juara',
+      'Bersifat eksibisi untuk pembinaan usia dini — juara Futsal Anak tidak masuk hitungan perolehan medali antar RW',
+      'Menggunakan sistem bertemu (setiap tim saling bertemu) tanpa ada babak final; peringkat teratas klasemen menjadi juara eksibisi',
       'Usia peserta maksimal 12 tahun (dibuktikan dengan KK/Akta Kelahiran & domisili Dusun II Wanajaya)',
       'Pertandingan format 5 vs 5 (termasuk kiper) dengan durasi 2 x 10 menit (istirahat 3 menit)',
       'Wajib memakai sepatu futsal, kaos kaki panjang, dan pelindung tulang kering (shinguard)'
     ],
-    system: 'Sistem Bertemu (Tanpa Babak Final)',
+    system: 'Eksibisi · Sistem Bertemu',
     quotaPerRW: '1 Tim Putra U-12 (maks. 10 pemain) per RW',
     venue: 'SOR RW 017',
     iconType: 'futsal',
@@ -453,7 +454,7 @@ export const OFFICIAL_RULES_SECTIONS = [
       'Bulu Tangkis Putra & Putri (Pasal 7): Format beregu ganda (masing-masing tim menurunkan 3 pasang ganda) menggunakan sistem rally point 42 poin tanpa deuce dengan pertukaran tempat pada poin 21. Panitia menyiapkan 2 pcs shuttlecock per partai; kelebihan pemakaian dipotong dari deposit tim.',
       'Bola Voli Putra & Putri (Pasal 8): Menggunakan sistem rally point — Set 1 dan Set 2 sampai 25 poin, sedangkan Set 3 sampai 15 poin. Khusus Bola Voli Putri menggunakan sistem bertemu penuh tanpa ada babak final; peringkat ditentukan dari poin dan selisih set/skor.',
       'Tenis Meja Beregu Putra (Pasal 9): Hanya mempertandingkan nomor Beregu Putra. Setiap tim terdiri dari 2 pemain tunggal dan 3 pasang ganda putra (pemain tidak boleh bermain 2 kali) dengan susunan partai Ganda–Tunggal–Ganda–Tunggal–Ganda, 11 poin per gim dengan 3 kemenangan per partai.',
-      'Futsal Anak U-12: Menggunakan format 5 vs 5 dengan sistem bertemu penuh tanpa ada babak final; juara ditentukan langsung dari klasemen poin tertinggi.'
+      'Futsal Anak U-12 (Eksibisi): Menggunakan format 5 vs 5 dengan sistem bertemu penuh tanpa babak final. Karena bersifat eksibisi, juara Futsal Anak tidak masuk hitungan perolehan medali antar RW.'
     ],
   },
   {
@@ -490,7 +491,7 @@ export const OFFICIAL_RULES_SECTIONS = [
     id: 'bab-6',
     title: 'BAB VI · Penghargaan & Ketentuan Penutup (Pasal 19–20)',
     points: [
-      'Pemenang ditetapkan berdasarkan hasil pertandingan yang sah; Juara I, II, dan III diberikan penghargaan sesuai ketentuan panitia serta tersedia penghargaan khusus sportivitas.',
+      'Pemenang ditetapkan berdasarkan hasil pertandingan yang sah; Juara I, II, dan III pada cabang resmi (Bulu Tangkis, Bola Voli, Tenis Meja) masuk hitungan medali antar RW, sedangkan Futsal Anak U-12 bersifat eksibisi dan tidak masuk hitungan perolehan medali.',
       'Hal-hal yang belum diatur dalam peraturan ini ditetapkan melalui keputusan panitia sepanjang tidak bertentangan dengan aturan cabang olahraga yang berlaku.',
       'Perubahan peraturan wajib diumumkan kepada seluruh tim sebelum diberlakukan, dan seluruh peserta dianggap memahami serta menyetujui peraturan ini setelah mengikuti pertandingan.'
     ],
