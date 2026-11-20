@@ -84,14 +84,14 @@ export default function GalleryEditModal({
       onClick={() => {
         if (!isSaving) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-gallery-modal-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl glass-card rounded-3xl border border-cyan-400/30 bg-[#0b1022] p-4 sm:p-7 shadow-2xl max-h-[92vh] overflow-y-auto"
+        className="relative w-full sm:max-w-2xl glass-card rounded-t-3xl sm:rounded-3xl border border-cyan-400/30 bg-[#0b1022] p-4 sm:p-7 shadow-2xl max-h-[92dvh] overflow-y-auto"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 pb-4 mb-5 border-b border-white/10">

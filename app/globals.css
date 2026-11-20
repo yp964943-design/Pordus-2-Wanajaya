@@ -66,5 +66,18 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 4.5rem;
   color-scheme: dark;
+  overflow-x: clip;
+}
+
+@media (min-width: 640px) {
+  html {
+    scroll-padding-top: 5.5rem;
+  }
+}
+
+body {
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
 }

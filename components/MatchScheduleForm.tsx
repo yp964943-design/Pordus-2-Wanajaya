@@ -7,14 +7,26 @@ import {
   Clock,
   MapPin,
   PlusCircle,
+  Pencil,
   Shield,
   AlertCircle,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import { BadmintonDoublePartai, MatchItem, RW_LOGOS } from '@/data/pordusData';
+import {
+  formatIndonesianDate,
+  formatWibTime,
+  parseIndonesianDateToIso,
+  parseWibTimeTo24,
+} from '@/lib/matchDateTime';
 
 interface MatchScheduleFormProps {
-  onAddMatch: (match: MatchItem) => void;
+  mode?: 'create' | 'edit';
+  matches?: MatchItem[];
+  initialMatchId?: string;
+  onAddMatch?: (match: MatchItem) => Promise<void> | void;
+  onUpdateMatch?: (match: MatchItem) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -64,23 +76,11 @@ function isRoundRobinSport(sport: MatchItem['sport'], category: string): boolean
 
 const RW_KEYS = Object.keys(RW_LOGOS);
 
-function formatIndonesianDate(isoDate: string): string {
-  if (!isoDate) return '';
-  const [year, month, day] = isoDate.split('-').map(Number);
-  if (!year || !month || !day) return isoDate;
-  const dateObj = new Date(year, month - 1, day);
-  return new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(dateObj);
-}
-
-function formatWibTime(time24: string): string {
-  if (!time24) return '';
-  return `${time24.replace(':', '.')} WIB`;
-}
+const DEFAULT_BADMINTON_PAIRS: BadmintonDoublePartai[] = [
+  { partai: 1, label: 'Ganda 1', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
+  { partai: 2, label: 'Ganda 2', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
+  { partai: 3, label: 'Ganda 3', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
+];
 
 function TeamLogoPreview({ rw }: { rw: string }) {
   const info = RW_LOGOS[rw];
@@ -115,26 +115,78 @@ function TeamLogoPreview({ rw }: { rw: string }) {
   );
 }
 
-export default function MatchScheduleForm({ onAddMatch, onClose }: MatchScheduleFormProps) {
-  const [sport, setSport] = useState<MatchItem['sport']>('Bola Voli');
-  const [category, setCategory] = useState<string>('Putra');
-  const [round, setRound] = useState<string>('Group A');
-  const [teamARw, setTeamARw] = useState<string>(RW_KEYS[0] ?? 'RW 013');
-  const [teamBRw, setTeamBRw] = useState<string>(RW_KEYS[1] ?? 'RW 015');
-  const [dateIso, setDateIso] = useState<string>('2026-11-22');
-  const [time24, setTime24] = useState<string>('15:30');
-  const [venue, setVenue] = useState<string>('SOR RW 017');
-  const [status, setStatus] = useState<MatchItem['status']>('Segera');
-  const [badmintonPairs, setBadmintonPairs] = useState<BadmintonDoublePartai[]>([
-    { partai: 1, label: 'Ganda 1', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
-    { partai: 2, label: 'Ganda 2', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
-    { partai: 3, label: 'Ganda 3', pairA: '', pairB: '', scoreA: 0, scoreB: 0 },
-  ]);
-  const [errorMessage, setErrorMessage] = useState<string>('');
+export default function MatchScheduleForm({
+  mode = 'create',
+  matches = [],
+  initialMatchId,
+  onAddMatch,
+  onUpdateMatch,
+  onClose,
+}: MatchScheduleFormProps) {
+  const isEditMode = mode === 'edit';
+  const startingMatch = isEditMode
+    ? matches.find((m) => m.id === initialMatchId) || matches[0]
+    : undefined;
 
-  const availableCategories = getCategoryOptionsForSport(sport);
+  const [selectedMatchId, setSelectedMatchId] = useState<string>(startingMatch?.id || '');
+  const [sport, setSport] = useState<MatchItem['sport']>(startingMatch?.sport || 'Bola Voli');
+  const [category, setCategory] = useState<string>(startingMatch?.category || 'Putra');
+  const [round, setRound] = useState<string>(startingMatch?.round || 'Group A');
+  const [teamARw, setTeamARw] = useState<string>(
+    startingMatch?.teamA.rw || RW_KEYS[0] || 'RW 013'
+  );
+  const [teamBRw, setTeamBRw] = useState<string>(
+    startingMatch?.teamB.rw || RW_KEYS[1] || 'RW 015'
+  );
+  const [dateIso, setDateIso] = useState<string>(
+    startingMatch ? parseIndonesianDateToIso(startingMatch.date) : '2026-11-22'
+  );
+  const [time24, setTime24] = useState<string>(
+    startingMatch ? parseWibTimeTo24(startingMatch.time) : '15:30'
+  );
+  const [venue, setVenue] = useState<string>(startingMatch?.venue || 'SOR RW 017');
+  const [status, setStatus] = useState<MatchItem['status']>(startingMatch?.status || 'Segera');
+  const [badmintonPairs, setBadmintonPairs] = useState<BadmintonDoublePartai[]>(
+    startingMatch?.badmintonDoubles && startingMatch.badmintonDoubles.length > 0
+      ? startingMatch.badmintonDoubles.map((d) => ({ ...d }))
+      : DEFAULT_BADMINTON_PAIRS.map((d) => ({ ...d }))
+  );
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const selectedMatch = isEditMode
+    ? matches.find((m) => m.id === selectedMatchId) || startingMatch
+    : undefined;
+
+  const handleSelectEditMatch = (nextId: string) => {
+    setSelectedMatchId(nextId);
+    setErrorMessage('');
+    const nextMatch = matches.find((m) => m.id === nextId);
+    if (!nextMatch) return;
+    setSport(nextMatch.sport);
+    setCategory(nextMatch.category);
+    setRound(nextMatch.round);
+    setTeamARw(nextMatch.teamA.rw);
+    setTeamBRw(nextMatch.teamB.rw);
+    setDateIso(parseIndonesianDateToIso(nextMatch.date));
+    setTime24(parseWibTimeTo24(nextMatch.time));
+    setVenue(nextMatch.venue);
+    setStatus(nextMatch.status);
+    setBadmintonPairs(
+      nextMatch.badmintonDoubles && nextMatch.badmintonDoubles.length > 0
+        ? nextMatch.badmintonDoubles.map((d) => ({ ...d }))
+        : DEFAULT_BADMINTON_PAIRS.map((d) => ({ ...d }))
+    );
+  };
+
+  const baseCategories = getCategoryOptionsForSport(sport);
+  const availableCategories = baseCategories.includes(category)
+    ? baseCategories
+    : [category, ...baseCategories];
+
   const usesRoundRobin = isRoundRobinSport(sport, category);
-  const availableRounds = usesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
+  const baseRounds = usesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
+  const availableRounds = baseRounds.includes(round) ? baseRounds : [round, ...baseRounds];
 
   const handlePairChange = (partai: number, field: 'pairA' | 'pairB', value: string) => {
     setBadmintonPairs((prev) =>
@@ -142,9 +194,14 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (isEditMode && !selectedMatch) {
+      setErrorMessage('Pilih jadwal pertandingan yang ingin diedit.');
+      return;
+    }
 
     if (!teamARw || !teamBRw) {
       setErrorMessage('Pilih kedua kontingen RW yang akan bertanding.');
@@ -174,9 +231,10 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
 
     const teamAInfo = RW_LOGOS[teamARw];
     const teamBInfo = RW_LOGOS[teamBRw];
+    const sameSportInEdit = Boolean(isEditMode && selectedMatch && selectedMatch.sport === sport);
 
-    const newMatch: MatchItem = {
-      id: `custom-${Date.now()}`,
+    const payloadMatch: MatchItem = {
+      id: isEditMode && selectedMatch ? selectedMatch.id : `custom-${Date.now()}`,
       sport,
       category,
       round,
@@ -184,24 +242,34 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
         rw: teamARw,
         name: teamAInfo?.name || 'Dusun II Wanajaya',
         logo: teamAInfo?.logo,
+        ...(sameSportInEdit && typeof selectedMatch?.teamA.score === 'number'
+          ? { score: selectedMatch.teamA.score }
+          : {}),
       },
       teamB: {
         rw: teamBRw,
         name: teamBInfo?.name || 'Dusun II Wanajaya',
         logo: teamBInfo?.logo,
+        ...(sameSportInEdit && typeof selectedMatch?.teamB.score === 'number'
+          ? { score: selectedMatch.teamB.score }
+          : {}),
       },
       date: formatIndonesianDate(dateIso),
       time: formatWibTime(time24),
       venue: trimmedVenue,
       status,
-      isCustom: true,
+      isCustom: isEditMode && selectedMatch ? Boolean(selectedMatch.isCustom) : true,
+      ...(sameSportInEdit && selectedMatch?.winner ? { winner: selectedMatch.winner } : {}),
       ...(sport === 'Bola Voli'
         ? {
-            sets: [
-              { set: 1, scoreA: 0, scoreB: 0 },
-              { set: 2, scoreA: 0, scoreB: 0 },
-              { set: 3, scoreA: 0, scoreB: 0 },
-            ],
+            sets:
+              sameSportInEdit && selectedMatch?.sets && selectedMatch.sets.length > 0
+                ? selectedMatch.sets.map((s) => ({ ...s }))
+                : [
+                    { set: 1, scoreA: 0, scoreB: 0 },
+                    { set: 2, scoreA: 0, scoreB: 0 },
+                    { set: 3, scoreA: 0, scoreB: 0 },
+                  ],
           }
         : {}),
       ...(sport === 'Bulu Tangkis'
@@ -215,23 +283,40 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
         : {}),
       ...(sport === 'Tenis Meja'
         ? {
-            tableTennisMatches: [
-              { partai: 1, label: 'Ganda 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
-              { partai: 2, label: 'Tunggal 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
-              { partai: 3, label: 'Ganda 2', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
-              { partai: 4, label: 'Tunggal 2', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
-              { partai: 5, label: 'Ganda 3', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
-            ],
+            tableTennisMatches:
+              sameSportInEdit &&
+              selectedMatch?.tableTennisMatches &&
+              selectedMatch.tableTennisMatches.length > 0
+                ? selectedMatch.tableTennisMatches.map((p) => ({ ...p }))
+                : [
+                    { partai: 1, label: 'Ganda 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
+                    { partai: 2, label: 'Tunggal 1', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
+                    { partai: 3, label: 'Ganda 2', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
+                    { partai: 4, label: 'Tunggal 2', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
+                    { partai: 5, label: 'Ganda 3', playerA: '', playerB: '', scoreA: 0, scoreB: 0 },
+                  ],
           }
         : {}),
       ...(sport === 'Futsal Anak'
         ? {
-            futsalGoalScorers: [],
+            futsalGoalScorers:
+              sameSportInEdit && selectedMatch?.futsalGoalScorers
+                ? selectedMatch.futsalGoalScorers.map((g) => ({ ...g }))
+                : [],
           }
         : {}),
     };
 
-    onAddMatch(newMatch);
+    try {
+      setIsSubmitting(true);
+      if (isEditMode) {
+        await onUpdateMatch?.(payloadMatch);
+      } else {
+        await onAddMatch?.(payloadMatch);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -239,19 +324,21 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
       <div className="flex items-start justify-between gap-4 pb-5 mb-6 border-b border-white/10">
         <div>
           <span className="text-xs font-semibold text-cyan-400 tracking-wide">
-            Formulir Jadwal Baru
+            {isEditMode ? 'Perbarui Jadwal Pertandingan' : 'Formulir Jadwal Baru'}
           </span>
           <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight mt-0.5">
-            Input Jadwal Pertandingan
+            {isEditMode ? 'Edit Jadwal Pertandingan' : 'Input Jadwal Pertandingan'}
           </h3>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Lengkapi cabang olahraga, kontingen RW, waktu, dan gelanggang pertandingan.
+            {isEditMode
+              ? 'Pilih pertandingan lalu ubah tanggal, jam WIB, cabang olahraga, kontingen RW, atau gelanggang.'
+              : 'Lengkapi cabang olahraga, kontingen RW, waktu, dan gelanggang pertandingan.'}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Tutup form input jadwal"
+          aria-label={isEditMode ? 'Tutup form edit jadwal' : 'Tutup form input jadwal'}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
         >
           <X className="w-4 h-4" />
@@ -268,308 +355,354 @@ export default function MatchScheduleForm({ onAddMatch, onClose }: MatchSchedule
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Row 1: Cabang Olahraga, Kategori, Babak/Grup */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="match-sport" className="block text-xs font-semibold text-slate-200 mb-2">
-              Cabang Olahraga
-            </label>
-            <select
-              id="match-sport"
-              value={sport}
-              onChange={(e) => {
-                const nextSport = e.target.value as MatchItem['sport'];
-                const nextCategories = getCategoryOptionsForSport(nextSport);
-                const nextCategory = nextCategories.includes(category)
-                  ? category
-                  : nextCategories[0];
-                setSport(nextSport);
-                setCategory(nextCategory);
-                const nextUsesRoundRobin = isRoundRobinSport(nextSport, nextCategory);
-                const nextRounds = nextUsesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
-                if (!nextRounds.includes(round)) {
-                  setRound(nextRounds[0]);
-                }
-              }}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-            >
-              {SPORTS_OPTIONS.map((item) => (
-                <option key={item} value={item} className="bg-[#0a0f24] text-white">
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="match-category" className="block text-xs font-semibold text-slate-200 mb-2">
-              Kategori Nomor
-            </label>
-            <select
-              id="match-category"
-              value={category}
-              onChange={(e) => {
-                const nextCategory = e.target.value;
-                setCategory(nextCategory);
-                const nextUsesRoundRobin = isRoundRobinSport(sport, nextCategory);
-                const nextRounds = nextUsesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
-                if (!nextRounds.includes(round)) {
-                  setRound(nextRounds[0]);
-                }
-              }}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-            >
-              {availableCategories.map((item) => (
-                <option key={item} value={item} className="bg-[#0a0f24] text-white">
-                  {item}
-                </option>
-              ))}
-            </select>
-            {sport === 'Tenis Meja' && (
-              <p className="text-[11px] text-cyan-300/90 mt-1.5">
-                Khusus kategori Beregu Putra.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="match-round" className="block text-xs font-semibold text-slate-200 mb-2">
-              {usesRoundRobin ? 'Sistem / Putaran' : 'Grup / Babak'}
-            </label>
-            <select
-              id="match-round"
-              value={round}
-              onChange={(e) => setRound(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-            >
-              {availableRounds.map((item) => (
-                <option key={item} value={item} className="bg-[#0a0f24] text-white">
-                  {item}
-                </option>
-              ))}
-            </select>
-            {usesRoundRobin && (
-              <p className="text-[11px] text-amber-300/90 mt-1.5">
-                Sistem bertemu penuh (tanpa babak final).
-              </p>
-            )}
-          </div>
+      {isEditMode && matches.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-400">
+          Belum ada jadwal pertandingan yang tersedia untuk diedit.
         </div>
-
-        {/* Row 2: Kontingen RW A vs Kontingen RW B */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="match-team-a" className="block text-xs font-semibold text-slate-200 mb-2">
-              Kontingen Tim A
-            </label>
-            <div className="flex items-center gap-3">
-              <TeamLogoPreview rw={teamARw} />
-              <select
-                id="match-team-a"
-                value={teamARw}
-                onChange={(e) => setTeamARw(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Match Selector in Edit Mode */}
+          {isEditMode && (
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-cyan-400/20">
+              <label
+                htmlFor="edit-schedule-match-select"
+                className="block text-xs font-semibold text-cyan-300 mb-2"
               >
-                {RW_KEYS.map((rwKey) => (
-                  <option key={rwKey} value={rwKey} className="bg-[#0a0f24] text-white">
-                    {rwKey} · {RW_LOGOS[rwKey].name}
+                Pilih Pertandingan yang Akan Diedit
+              </label>
+              <select
+                id="edit-schedule-match-select"
+                value={selectedMatch?.id || ''}
+                onChange={(e) => handleSelectEditMatch(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-xs sm:text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+              >
+                {matches.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-[#0a0f24] text-white">
+                    {m.date} · {m.time} · {m.sport} ({m.category}) · {m.teamA.rw} vs {m.teamB.rw} · {m.round}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
+          )}
 
-          <div>
-            <label htmlFor="match-team-b" className="block text-xs font-semibold text-slate-200 mb-2">
-              Kontingen Tim B (Lawan)
-            </label>
-            <div className="flex items-center gap-3">
-              <TeamLogoPreview rw={teamBRw} />
+          {/* Row 1: Cabang Olahraga, Kategori, Babak/Grup */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="match-sport" className="block text-xs font-semibold text-slate-200 mb-2">
+                Cabang Olahraga
+              </label>
               <select
-                id="match-team-b"
-                value={teamBRw}
-                onChange={(e) => setTeamBRw(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                id="match-sport"
+                value={sport}
+                onChange={(e) => {
+                  const nextSport = e.target.value as MatchItem['sport'];
+                  const nextCategories = getCategoryOptionsForSport(nextSport);
+                  const nextCategory = nextCategories.includes(category)
+                    ? category
+                    : nextCategories[0];
+                  setSport(nextSport);
+                  setCategory(nextCategory);
+                  const nextUsesRoundRobin = isRoundRobinSport(nextSport, nextCategory);
+                  const nextRounds = nextUsesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
+                  if (!nextRounds.includes(round)) {
+                    setRound(nextRounds[0]);
+                  }
+                }}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
               >
-                {RW_KEYS.map((rwKey) => (
-                  <option key={rwKey} value={rwKey} className="bg-[#0a0f24] text-white">
-                    {rwKey} · {RW_LOGOS[rwKey].name}
+                {SPORTS_OPTIONS.map((item) => (
+                  <option key={item} value={item} className="bg-[#0a0f24] text-white">
+                    {item}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
-        </div>
 
-        {/* Row 3: Tanggal, Jam, Lokasi, Status */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="match-date" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
-              <CalendarDays className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Tanggal</span>
-            </label>
-            <input
-              id="match-date"
-              type="date"
-              value={dateIso}
-              onChange={(e) => setDateIso(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 tabular-nums"
-              required
-            />
-            {dateIso && (
-              <p className="text-[11px] text-slate-400 mt-1.5">
-                {formatIndonesianDate(dateIso)}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="match-time" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Jam (WIB)</span>
-            </label>
-            <input
-              id="match-time"
-              type="time"
-              value={time24}
-              onChange={(e) => setTime24(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 tabular-nums"
-              required
-            />
-            {time24 && (
-              <p className="text-[11px] text-slate-400 mt-1.5 tabular-nums">
-                Tampilan: {formatWibTime(time24)}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="match-venue" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Lokasi</span>
-            </label>
-            <input
-              id="match-venue"
-              type="text"
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              placeholder="SOR RW 017"
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="match-status" className="block text-xs font-semibold text-slate-200 mb-2">
-              Status Laga
-            </label>
-            <select
-              id="match-status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as MatchItem['status'])}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
-            >
-              <option value="Segera" className="bg-[#0a0f24] text-white">
-                Segera
-              </option>
-              <option value="Sedang Berlangsung" className="bg-[#0a0f24] text-white">
-                Sedang Berlangsung
-              </option>
-              <option value="Selesai" className="bg-[#0a0f24] text-white">
-                Selesai
-              </option>
-            </select>
-          </div>
-        </div>
-
-        {/* Optional Lineup for Bulu Tangkis Ganda 1, Ganda 2, Ganda 3 */}
-        {sport === 'Bulu Tangkis' && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-cyan-400/20 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-              <p className="text-xs font-bold text-cyan-300">
-                Susunan Pasangan Bulu Tangkis (Ganda 1, Ganda 2, dan Ganda 3)
-              </p>
-              <span className="text-[11px] text-slate-400">
-                Opsional · Skor diisi di form Input Hasil
-              </span>
+            <div>
+              <label htmlFor="match-category" className="block text-xs font-semibold text-slate-200 mb-2">
+                Kategori Nomor
+              </label>
+              <select
+                id="match-category"
+                value={category}
+                onChange={(e) => {
+                  const nextCategory = e.target.value;
+                  setCategory(nextCategory);
+                  const nextUsesRoundRobin = isRoundRobinSport(sport, nextCategory);
+                  const nextRounds = nextUsesRoundRobin ? ROUND_ROBIN_ROUNDS : KNOCKOUT_ROUNDS;
+                  if (!nextRounds.includes(round)) {
+                    setRound(nextRounds[0]);
+                  }
+                }}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+              >
+                {availableCategories.map((item) => (
+                  <option key={item} value={item} className="bg-[#0a0f24] text-white">
+                    {item}
+                  </option>
+                ))}
+              </select>
+              {sport === 'Tenis Meja' && (
+                <p className="text-[11px] text-cyan-300/90 mt-1.5">
+                  Khusus kategori Beregu Putra.
+                </p>
+              )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {badmintonPairs.map((item) => (
-                <div
-                  key={item.partai}
-                  className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2.5"
+
+            <div>
+              <label htmlFor="match-round" className="block text-xs font-semibold text-slate-200 mb-2">
+                {usesRoundRobin ? 'Sistem / Putaran' : 'Grup / Babak'}
+              </label>
+              <select
+                id="match-round"
+                value={round}
+                onChange={(e) => setRound(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+              >
+                {availableRounds.map((item) => (
+                  <option key={item} value={item} className="bg-[#0a0f24] text-white">
+                    {item}
+                  </option>
+                ))}
+              </select>
+              {usesRoundRobin && (
+                <p className="text-[11px] text-amber-300/90 mt-1.5">
+                  Sistem bertemu penuh (tanpa babak final).
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Kontingen RW A vs Kontingen RW B */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="match-team-a" className="block text-xs font-semibold text-slate-200 mb-2">
+                Kontingen Tim A
+              </label>
+              <div className="flex items-center gap-3">
+                <TeamLogoPreview rw={teamARw} />
+                <select
+                  id="match-team-a"
+                  value={teamARw}
+                  onChange={(e) => setTeamARw(e.target.value)}
+                  className="flex-1 min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
                 >
-                  <p className="text-xs font-bold text-white text-center">{item.label}</p>
-                  <div>
-                    <label
-                      htmlFor={`sched-ganda-${item.partai}-a`}
-                      className="block text-[11px] text-slate-400 mb-1"
-                    >
-                      Pasangan {teamARw}
-                    </label>
-                    <input
-                      id={`sched-ganda-${item.partai}-a`}
-                      type="text"
-                      value={item.pairA || ''}
-                      onChange={(e) => handlePairChange(item.partai, 'pairA', e.target.value)}
-                      placeholder={`Nama ${item.label} ${teamARw}`}
-                      className="w-full px-3 py-2 text-xs rounded-lg glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor={`sched-ganda-${item.partai}-b`}
-                      className="block text-[11px] text-slate-400 mb-1"
-                    >
-                      Pasangan {teamBRw}
-                    </label>
-                    <input
-                      id={`sched-ganda-${item.partai}-b`}
-                      type="text"
-                      value={item.pairB || ''}
-                      onChange={(e) => handlePairChange(item.partai, 'pairB', e.target.value)}
-                      placeholder={`Nama ${item.label} ${teamBRw}`}
-                      className="w-full px-3 py-2 text-xs rounded-lg glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
-                    />
-                  </div>
-                </div>
-              ))}
+                  {RW_KEYS.map((rwKey) => (
+                    <option key={rwKey} value={rwKey} className="bg-[#0a0f24] text-white">
+                      {rwKey} · {RW_LOGOS[rwKey].name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="match-team-b" className="block text-xs font-semibold text-slate-200 mb-2">
+                Kontingen Tim B (Lawan)
+              </label>
+              <div className="flex items-center gap-3">
+                <TeamLogoPreview rw={teamBRw} />
+                <select
+                  id="match-team-b"
+                  value={teamBRw}
+                  onChange={(e) => setTeamBRw(e.target.value)}
+                  className="flex-1 min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                >
+                  {RW_KEYS.map((rwKey) => (
+                    <option key={rwKey} value={rwKey} className="bg-[#0a0f24] text-white">
+                      {rwKey} · {RW_LOGOS[rwKey].name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* Footer Actions */}
-        <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-slate-400">
-            {sport === 'Bola Voli'
-              ? 'Skor Set 1, Set 2, dan Set 3 otomatis disiapkan pada tab Hasil Pertandingan.'
-              : sport === 'Bulu Tangkis'
-                ? 'Partai Ganda 1, Ganda 2, dan Ganda 3 otomatis disiapkan untuk input skor hasil.'
-                : sport === 'Tenis Meja'
-                  ? 'Partai Ganda 1, Tunggal 1, Ganda 2, Tunggal 2, dan Ganda 3 otomatis disiapkan pada Input Hasil.'
-                  : sport === 'Futsal Anak'
-                    ? 'Form pencetak gol dan skor akhir otomatis disiapkan pada Input Hasil.'
-                    : 'Jadwal baru akan langsung tampil pada daftar jadwal dan filter tanggal.'}
-          </p>
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Simpan Jadwal</span>
-            </button>
+          {/* Row 3: Tanggal, Jam, Lokasi, Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="match-date" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
+                <CalendarDays className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Tanggal</span>
+              </label>
+              <input
+                id="match-date"
+                type="date"
+                value={dateIso}
+                onChange={(e) => setDateIso(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 tabular-nums"
+                required
+              />
+              {dateIso && (
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  {formatIndonesianDate(dateIso)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="match-time" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Jam (WIB)</span>
+              </label>
+              <input
+                id="match-time"
+                type="time"
+                value={time24}
+                onChange={(e) => setTime24(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 tabular-nums"
+                required
+              />
+              {time24 && (
+                <p className="text-[11px] text-slate-400 mt-1.5 tabular-nums">
+                  Tampilan: {formatWibTime(time24)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="match-venue" className="flex items-center gap-1.5 text-xs font-semibold text-slate-200 mb-2">
+                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Lokasi</span>
+              </label>
+              <input
+                id="match-venue"
+                type="text"
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+                placeholder="SOR RW 017"
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="match-status" className="block text-xs font-semibold text-slate-200 mb-2">
+                Status Laga
+              </label>
+              <select
+                id="match-status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as MatchItem['status'])}
+                className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+              >
+                <option value="Segera" className="bg-[#0a0f24] text-white">
+                  Segera
+                </option>
+                <option value="Sedang Berlangsung" className="bg-[#0a0f24] text-white">
+                  Sedang Berlangsung
+                </option>
+                <option value="Selesai" className="bg-[#0a0f24] text-white">
+                  Selesai
+                </option>
+              </select>
+            </div>
           </div>
-        </div>
-      </form>
+
+          {/* Optional Lineup for Bulu Tangkis Ganda 1, Ganda 2, Ganda 3 */}
+          {sport === 'Bulu Tangkis' && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-cyan-400/20 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <p className="text-xs font-bold text-cyan-300">
+                  Susunan Pasangan Bulu Tangkis (Ganda 1, Ganda 2, dan Ganda 3)
+                </p>
+                <span className="text-[11px] text-slate-400">
+                  Opsional · Skor diisi di form Input Hasil
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {badmintonPairs.map((item) => (
+                  <div
+                    key={item.partai}
+                    className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2.5"
+                  >
+                    <p className="text-xs font-bold text-white text-center">{item.label}</p>
+                    <div>
+                      <label
+                        htmlFor={`sched-ganda-${item.partai}-a`}
+                        className="block text-[11px] text-slate-400 mb-1"
+                      >
+                        Pasangan {teamARw}
+                      </label>
+                      <input
+                        id={`sched-ganda-${item.partai}-a`}
+                        type="text"
+                        value={item.pairA || ''}
+                        onChange={(e) => handlePairChange(item.partai, 'pairA', e.target.value)}
+                        placeholder={`Nama ${item.label} ${teamARw}`}
+                        className="w-full px-3 py-2 text-xs rounded-lg glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`sched-ganda-${item.partai}-b`}
+                        className="block text-[11px] text-slate-400 mb-1"
+                      >
+                        Pasangan {teamBRw}
+                      </label>
+                      <input
+                        id={`sched-ganda-${item.partai}-b`}
+                        type="text"
+                        value={item.pairB || ''}
+                        onChange={(e) => handlePairChange(item.partai, 'pairB', e.target.value)}
+                        placeholder={`Nama ${item.label} ${teamBRw}`}
+                        className="w-full px-3 py-2 text-xs rounded-lg glass-input bg-[#0a0f24] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Footer Actions */}
+          <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-400">
+              {isEditMode
+                ? 'Perubahan jadwal otomatis diurutkan berdasarkan tanggal & jam dan disinkronkan ke semua device.'
+                : sport === 'Bola Voli'
+                  ? 'Skor Set 1, Set 2, dan Set 3 otomatis disiapkan pada tab Hasil Pertandingan.'
+                  : sport === 'Bulu Tangkis'
+                    ? 'Partai Ganda 1, Ganda 2, dan Ganda 3 otomatis disiapkan untuk input skor hasil.'
+                    : sport === 'Tenis Meja'
+                      ? 'Partai Ganda 1, Tunggal 1, Ganda 2, Tunggal 2, dan Ganda 3 otomatis disiapkan pada Input Hasil.'
+                      : sport === 'Futsal Anak'
+                        ? 'Form pencetak gol dan skor akhir otomatis disiapkan pada Input Hasil.'
+                        : 'Jadwal baru akan langsung tampil pada daftar jadwal dan filter tanggal.'}
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 text-slate-950 font-bold text-xs shadow-lg hover:shadow-[0_0_24px_rgba(34,211,238,0.35)] active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isEditMode ? (
+                  <>
+                    {isSubmitting ? (
+                      <CheckCircle2 className="w-4 h-4 animate-pulse" />
+                    ) : (
+                      <Pencil className="w-4 h-4" />
+                    )}
+                    <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4" />
+                    <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Jadwal'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

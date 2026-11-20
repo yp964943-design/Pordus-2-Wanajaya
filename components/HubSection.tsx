@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Trash2,
   ClipboardEdit,
+  Pencil,
   X,
   LogOut,
   Cloud,
@@ -32,8 +33,14 @@ import {
   removeMatchResult,
   saveCustomMatch,
   saveMatchResult,
+  updateMatchSchedule,
   useTournamentSync,
 } from '@/lib/tournamentSync';
+import {
+  compareIndonesianDates,
+  compareMatchesByDateTime,
+  parseMatchTimeMinutes,
+} from '@/lib/matchDateTime';
 
 export type HubTab = 'jadwal' | 'hasil' | 'klasemen' | 'bagan';
 
@@ -42,9 +49,9 @@ interface HubSectionProps {
   onTabChange?: (tab: HubTab) => void;
   onOpenRules?: () => void;
   isAdmin: boolean;
-  adminPanel: 'none' | 'jadwal' | 'hasil';
-  onAdminPanelChange: (panel: 'none' | 'jadwal' | 'hasil') => void;
-  onRequestAdminLogin: (intent?: 'jadwal' | 'hasil') => void;
+  adminPanel: 'none' | 'jadwal' | 'edit-jadwal' | 'hasil';
+  onAdminPanelChange: (panel: 'none' | 'jadwal' | 'edit-jadwal' | 'hasil') => void;
+  onRequestAdminLogin: (intent?: 'jadwal' | 'edit-jadwal' | 'hasil') => void;
   onLogoutAdmin: () => void;
 }
 
@@ -233,68 +240,73 @@ function StandingsTable({
 }) {
   const pointTextClass = accent === 'emerald' ? 'text-emerald-300' : 'text-cyan-300';
   return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className="w-full min-w-[460px] text-left text-xs text-slate-300">
-        <thead className="bg-white/5 text-[11px] uppercase text-slate-400 border-b border-white/10">
-          <tr>
-            <th className="px-2 sm:px-2.5 py-2.5 text-center font-semibold w-8 sm:w-9">#</th>
-            <th className="px-2.5 sm:px-3 py-2.5 font-semibold">Tim RW</th>
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">P</th>
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">W</th>
-            {showDraw && <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">D</th>}
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">L</th>
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GA</th>
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GF</th>
-            <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GD</th>
-            <th className={`px-2.5 sm:px-3 py-2.5 text-right font-semibold ${pointTextClass}`}>Poin</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5 tabular-nums">
-          {rows.map((row, idx) => (
-            <tr key={row.rw} className="hover:bg-white/[0.03]">
-              <td className="px-2.5 py-2.5 text-center font-bold text-slate-400">
-                {idx + 1}
-              </td>
-              <td className="px-3 py-2.5 font-semibold text-white whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  {row.logo && (
-                    <div className="w-5 h-5 rounded bg-white p-0.5 border border-white/20 shrink-0 overflow-hidden">
-                      <RwLogoImage
-                        src={row.logo}
-                        alt={`Logo ${row.rw}`}
-                        size={20}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  )}
-                  <span>{row.rw}</span>
-                  <span className="text-slate-400 font-normal hidden sm:inline">· {row.name}</span>
-                </div>
-              </td>
-              <td className="px-2 py-2.5 text-center">{row.played}</td>
-              <td className="px-2 py-2.5 text-center text-emerald-300 font-semibold">{row.won}</td>
-              {showDraw && <td className="px-2 py-2.5 text-center">{row.draw}</td>}
-              <td className="px-2 py-2.5 text-center">{row.lost}</td>
-              <td className="px-2 py-2.5 text-center text-slate-200">{row.ga}</td>
-              <td className="px-2 py-2.5 text-center text-slate-200">{row.gf}</td>
-              <td
-                className={`px-2 py-2.5 text-center font-semibold ${
-                  row.gd > 0
-                    ? 'text-emerald-300'
-                    : row.gd < 0
-                      ? 'text-rose-300'
-                      : 'text-slate-400'
-                }`}
-              >
-                {row.gd > 0 ? `+${row.gd}` : row.gd}
-              </td>
-              <td className={`px-3 py-2.5 text-right font-bold ${pointTextClass}`}>
-                {row.points}
-              </td>
+    <div className="space-y-1.5">
+      <p className="sm:hidden text-[11px] text-slate-400 text-right">
+        Geser tabel ke samping →
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full min-w-[440px] text-left text-xs text-slate-300">
+          <thead className="bg-white/5 text-[11px] uppercase text-slate-400 border-b border-white/10">
+            <tr>
+              <th className="px-2 sm:px-2.5 py-2.5 text-center font-semibold w-8 sm:w-9">#</th>
+              <th className="px-2 sm:px-3 py-2.5 font-semibold">Tim RW</th>
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">P</th>
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">W</th>
+              {showDraw && <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">D</th>}
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">L</th>
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GA</th>
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GF</th>
+              <th className="px-1.5 sm:px-2 py-2.5 text-center font-semibold">GD</th>
+              <th className={`px-2 sm:px-3 py-2.5 text-right font-semibold ${pointTextClass}`}>Poin</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-white/5 tabular-nums">
+            {rows.map((row, idx) => (
+              <tr key={row.rw} className="hover:bg-white/[0.03]">
+                <td className="px-2 sm:px-2.5 py-2.5 text-center font-bold text-slate-400">
+                  {idx + 1}
+                </td>
+                <td className="px-2 sm:px-3 py-2.5 font-semibold text-white whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    {row.logo && (
+                      <div className="w-5 h-5 rounded bg-white p-0.5 border border-white/20 shrink-0 overflow-hidden">
+                        <RwLogoImage
+                          src={row.logo}
+                          alt={`Logo ${row.rw}`}
+                          size={20}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <span>{row.rw}</span>
+                    <span className="text-slate-400 font-normal hidden sm:inline">· {row.name}</span>
+                  </div>
+                </td>
+                <td className="px-1.5 sm:px-2 py-2.5 text-center">{row.played}</td>
+                <td className="px-1.5 sm:px-2 py-2.5 text-center text-emerald-300 font-semibold">{row.won}</td>
+                {showDraw && <td className="px-1.5 sm:px-2 py-2.5 text-center">{row.draw}</td>}
+                <td className="px-1.5 sm:px-2 py-2.5 text-center">{row.lost}</td>
+                <td className="px-1.5 sm:px-2 py-2.5 text-center text-slate-200">{row.ga}</td>
+                <td className="px-1.5 sm:px-2 py-2.5 text-center text-slate-200">{row.gf}</td>
+                <td
+                  className={`px-1.5 sm:px-2 py-2.5 text-center font-semibold ${
+                    row.gd > 0
+                      ? 'text-emerald-300'
+                      : row.gd < 0
+                        ? 'text-rose-300'
+                        : 'text-slate-400'
+                  }`}
+                >
+                  {row.gd > 0 ? `+${row.gd}` : row.gd}
+                </td>
+                <td className={`px-2 sm:px-3 py-2.5 text-right font-bold ${pointTextClass}`}>
+                  {row.points}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -358,48 +370,55 @@ export default function HubSection({
   const [currentDatePage, setCurrentDatePage] = useState<number>(1);
   const [standings] = useState<RWStanding[]>(INITIAL_STANDINGS);
   const [selectedMatchForResult, setSelectedMatchForResult] = useState<string | undefined>(undefined);
+  const [selectedMatchForEdit, setSelectedMatchForEdit] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string>('');
 
   const isFormOpen = isAdmin && adminPanel === 'jadwal';
+  const isEditFormOpen = isAdmin && adminPanel === 'edit-jadwal';
   const isResultFormOpen = isAdmin && adminPanel === 'hasil';
 
-  const { customMatches, resultOverrides } = useTournamentSync();
+  const { customMatches, defaultMatchOverrides, resultOverrides } = useTournamentSync();
 
   const allMatches = useMemo<MatchItem[]>(() => {
-    return [...MATCHES_SCHEDULE, ...customMatches].map((match) => {
-      const override = resultOverrides[match.id];
-      const teamAInfo = RW_LOGOS[match.teamA.rw];
-      const teamBInfo = RW_LOGOS[match.teamB.rw];
-      const baseTeamA = {
-        ...match.teamA,
-        name: teamAInfo?.name || match.teamA.name,
-        logo: teamAInfo?.logo || match.teamA.logo,
-      };
-      const baseTeamB = {
-        ...match.teamB,
-        name: teamBInfo?.name || match.teamB.name,
-        logo: teamBInfo?.logo || match.teamB.logo,
-      };
-      if (!override) {
+    const mergedDefaults = MATCHES_SCHEDULE.map(
+      (match) => defaultMatchOverrides[match.id] ?? match
+    );
+    return [...mergedDefaults, ...customMatches]
+      .map((match) => {
+        const override = resultOverrides[match.id];
+        const teamAInfo = RW_LOGOS[match.teamA.rw];
+        const teamBInfo = RW_LOGOS[match.teamB.rw];
+        const baseTeamA = {
+          ...match.teamA,
+          name: teamAInfo?.name || match.teamA.name,
+          logo: teamAInfo?.logo || match.teamA.logo,
+        };
+        const baseTeamB = {
+          ...match.teamB,
+          name: teamBInfo?.name || match.teamB.name,
+          logo: teamBInfo?.logo || match.teamB.logo,
+        };
+        if (!override) {
+          return {
+            ...match,
+            teamA: baseTeamA,
+            teamB: baseTeamB,
+          };
+        }
         return {
           ...match,
-          teamA: baseTeamA,
-          teamB: baseTeamB,
+          status: override.status,
+          winner: override.winner,
+          teamA: { ...baseTeamA, score: override.scoreA },
+          teamB: { ...baseTeamB, score: override.scoreB },
+          sets: override.sets ?? match.sets,
+          badmintonDoubles: override.badmintonDoubles ?? match.badmintonDoubles,
+          tableTennisMatches: override.tableTennisMatches ?? match.tableTennisMatches,
+          futsalGoalScorers: override.futsalGoalScorers ?? match.futsalGoalScorers,
         };
-      }
-      return {
-        ...match,
-        status: override.status,
-        winner: override.winner,
-        teamA: { ...baseTeamA, score: override.scoreA },
-        teamB: { ...baseTeamB, score: override.scoreB },
-        sets: override.sets ?? match.sets,
-        badmintonDoubles: override.badmintonDoubles ?? match.badmintonDoubles,
-        tableTennisMatches: override.tableTennisMatches ?? match.tableTennisMatches,
-        futsalGoalScorers: override.futsalGoalScorers ?? match.futsalGoalScorers,
-      };
-    });
-  }, [customMatches, resultOverrides]);
+      })
+      .sort(compareMatchesByDateTime);
+  }, [customMatches, defaultMatchOverrides, resultOverrides]);
 
   const handleAddMatch = async (newMatch: MatchItem) => {
     if (!isAdmin) {
@@ -407,7 +426,9 @@ export default function HubSection({
       return;
     }
     const result = await saveCustomMatch(newMatch);
-    const nextDates = Array.from(new Set([...allMatches, newMatch].map((m) => m.date)));
+    const nextDates = Array.from(new Set([...allMatches, newMatch].map((m) => m.date))).sort(
+      compareIndonesianDates
+    );
     const targetPage = Math.max(1, nextDates.indexOf(newMatch.date) + 1);
     setSportFilter('Semua');
     setCategoryFilter('Semua');
@@ -418,6 +439,29 @@ export default function HubSection({
     setActiveTab('jadwal');
     onAdminPanelChange('none');
     const baseText = `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil ditambahkan.`;
+    setSuccessMessage(
+      result.syncedToCloud
+        ? `${baseText} Tersinkronisasi ke semua device.`
+        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
+    );
+  };
+
+  const handleUpdateMatch = async (updatedMatch: MatchItem) => {
+    if (!isAdmin) {
+      onRequestAdminLogin('edit-jadwal');
+      return;
+    }
+    const result = await updateMatchSchedule(updatedMatch);
+    const nextDates = Array.from(
+      new Set(
+        allMatches.map((m) => (m.id === updatedMatch.id ? updatedMatch.date : m.date))
+      )
+    ).sort(compareIndonesianDates);
+    const targetPage = Math.max(1, nextDates.indexOf(updatedMatch.date) + 1);
+    setCurrentDatePage(targetPage);
+    onAdminPanelChange('none');
+    setSelectedMatchForEdit(undefined);
+    const baseText = `Jadwal ${updatedMatch.sport} (${updatedMatch.teamA.rw} vs ${updatedMatch.teamB.rw}) berhasil diperbarui ke ${updatedMatch.date} pukul ${updatedMatch.time}.`;
     setSuccessMessage(
       result.syncedToCloud
         ? `${baseText} Tersinkronisasi ke semua device.`
@@ -483,6 +527,20 @@ export default function HubSection({
     el?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const openEditScheduleForMatch = (matchId?: string) => {
+    if (!isAdmin) {
+      onRequestAdminLogin('edit-jadwal');
+      return;
+    }
+    setSelectedMatchForEdit(matchId);
+    onAdminPanelChange('edit-jadwal');
+    if (activeTab !== 'jadwal' && activeTab !== 'hasil') {
+      setActiveTab('jadwal');
+    }
+    const el = document.getElementById('hub-content-view');
+    el?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const uniqueRws = Array.from(
     new Set([
       ...Object.keys(RW_LOGOS),
@@ -508,7 +566,7 @@ export default function HubSection({
         )
         .map((m) => m.date)
     )
-  );
+  ).sort(compareIndonesianDates);
 
   const effectiveDateFilter =
     dateFilter === 'Semua' || uniqueDates.includes(dateFilter) ? dateFilter : 'Semua';
@@ -542,7 +600,17 @@ export default function HubSection({
         map.set(match.date, [match]);
       }
     });
-    return Array.from(map.entries());
+    return Array.from(map.entries())
+      .sort(([dateA], [dateB]) => compareIndonesianDates(dateA, dateB))
+      .map(
+        ([dateLabel, items]) =>
+          [
+            dateLabel,
+            [...items].sort(
+              (a, b) => parseMatchTimeMinutes(a.time) - parseMatchTimeMinutes(b.time)
+            ),
+          ] as [string, MatchItem[]]
+      );
   }, [filteredMatches]);
 
   // When filtering by Cabor or RW (via dropdown or search), show all matching matches without date pagination
@@ -570,28 +638,28 @@ export default function HubSection({
   };
 
   return (
-    <section id="jadwal" className="py-10 md:py-12 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="jadwal" className="py-8 md:py-12 relative">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-7 sm:mb-10">
           <span className="text-xs font-bold tracking-widest text-cyan-400 uppercase">
             Pusat Informasi Turnamen
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
             Jadwal, Hasil, & Peraturan
           </h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-4 rounded-full" />
-          <p className="mt-4 text-sm sm:text-base text-slate-300">
+          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
+          <p className="mt-3.5 sm:mt-4 text-sm sm:text-base text-slate-300">
             Akses cepat jadwal pertandingan, papan skor hasil laga, klasemen medali RW, dan buku pedoman peraturan teknis.
           </p>
         </div>
 
         {/* Interactive Hub Content Area with Tabs */}
-        <div id="hub-content-view" className="glass-card rounded-3xl border border-white/15 p-4 sm:p-6 md:p-8">
+        <div id="hub-content-view" className="glass-card rounded-3xl border border-white/15 p-3.5 sm:p-6 md:p-8">
           
           {/* Segmented Control Filter Tabs */}
-          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 border-b border-white/10 pb-5 sm:pb-6 mb-6 sm:mb-8">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5 sm:gap-4 border-b border-white/10 pb-4 sm:pb-6 mb-5 sm:mb-8">
             <div className="grid grid-cols-2 sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-white/5 border border-white/10 w-full xl:w-auto">
               <button
                 onClick={() => setActiveTab('jadwal')}
@@ -673,6 +741,27 @@ export default function HubSection({
                     <button
                       type="button"
                       onClick={() => {
+                        if (activeTab !== 'jadwal' && activeTab !== 'hasil') setActiveTab('jadwal');
+                        const firstMatchForFilter =
+                          filteredMatches[0]?.id ||
+                          (sportFilter !== 'Semua'
+                            ? allMatches.find((m) => m.sport === sportFilter)?.id
+                            : allMatches[0]?.id);
+                        setSelectedMatchForEdit(firstMatchForFilter);
+                        onAdminPanelChange(isEditFormOpen ? 'none' : 'edit-jadwal');
+                      }}
+                      className={`flex-1 sm:flex-none min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                        isEditFormOpen
+                          ? 'bg-amber-500/20 text-amber-200 border border-amber-400/40'
+                          : 'bg-white/10 hover:bg-white/15 text-slate-100 border border-white/15'
+                      }`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>{isEditFormOpen ? 'Tutup Edit' : 'Edit Jadwal'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         if (activeTab !== 'hasil') setActiveTab('hasil');
                         const firstMatchForFilter =
                           sportFilter !== 'Semua'
@@ -750,8 +839,33 @@ export default function HubSection({
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <MatchScheduleForm
+                      mode="create"
                       onAddMatch={handleAddMatch}
                       onClose={() => onAdminPanelChange('none')}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Collapsible Edit Match Schedule Form (Admin Only) */}
+              <AnimatePresence initial={false}>
+                {isEditFormOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <MatchScheduleForm
+                      key={selectedMatchForEdit || 'edit-default'}
+                      mode="edit"
+                      matches={allMatches}
+                      initialMatchId={selectedMatchForEdit}
+                      onUpdateMatch={handleUpdateMatch}
+                      onClose={() => {
+                        onAdminPanelChange('none');
+                        setSelectedMatchForEdit(undefined);
+                      }}
                     />
                   </motion.div>
                 )}
@@ -782,8 +896,8 @@ export default function HubSection({
                 )}
               </AnimatePresence>
 
-              {/* Filters Row: Cabor, Kategori Putra/Putri, RW & Tanggal Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6 sm:mb-8">
+              {/* Filters Row: Cabor, Kategori Putra/Putri, RW & Tanggal Dropdowns (2x2 compact grid on mobile) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5 sm:mb-8">
                 {/* Cabor Dropdown Filter */}
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="sport-filter-select" className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap">
@@ -947,14 +1061,14 @@ export default function HubSection({
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-5">
                         {matches.map((match) => (
                           <div
                             key={match.id}
-                            className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/15 transition-all duration-200 flex flex-col justify-between"
+                            className="p-3.5 sm:p-6 rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/15 transition-all duration-200 flex flex-col justify-between"
                           >
-                            <div className="flex items-center justify-between text-xs mb-3.5 sm:mb-4 pb-2.5 sm:pb-3 border-b border-white/10 gap-2">
-                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <div className="flex items-center justify-between text-xs mb-3 sm:mb-4 pb-2.5 sm:pb-3 border-b border-white/10 gap-2">
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
                                 <span className="font-bold text-cyan-300">{match.sport}</span>
                                 <span className="text-slate-500">·</span>
                                 <span
@@ -987,7 +1101,7 @@ export default function HubSection({
                                     onClick={() => handleDeleteCustomMatch(match.id)}
                                     aria-label={`Hapus jadwal ${match.teamA.rw} vs ${match.teamB.rw}`}
                                     title="Hapus jadwal tambahan"
-                                    className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                    className="min-w-[44px] min-h-[44px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -996,9 +1110,9 @@ export default function HubSection({
                             </div>
 
                             {/* Teams with RW Logos and Score / VS */}
-                            <div className="flex items-stretch justify-between gap-2 sm:gap-4 my-1.5 sm:my-2">
+                            <div className="flex items-stretch justify-between gap-2 sm:gap-4 my-1 sm:my-2">
                               {/* Team A */}
-                              <div className={`flex-1 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamA.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
+                              <div className={`flex-1 min-w-0 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamA.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
                                 {match.teamA.logo ? (
                                   <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-2 sm:mb-3 flex items-center justify-center">
                                     <RwLogoImage
@@ -1012,14 +1126,14 @@ export default function HubSection({
                                     <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
                                   </div>
                                 )}
-                                <p className="text-base sm:text-xl font-black text-white tracking-tight">{match.teamA.rw}</p>
-                                <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1">
+                                <p className="text-sm sm:text-xl font-black text-white tracking-tight truncate w-full">{match.teamA.rw}</p>
+                                <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1 w-full">
                                   {match.teamA.name || 'Dusun II Wanajaya'}
                                 </p>
                               </div>
 
                               {/* Center VS / Scoreboard */}
-                              <div className="px-1 sm:px-2 flex flex-col items-center justify-center shrink-0">
+                              <div className="px-0.5 sm:px-2 flex flex-col items-center justify-center shrink-0">
                                 {match.status === 'Selesai' || match.status === 'Sedang Berlangsung' ? (
                                   <div className="text-center">
                                     <div className="text-lg sm:text-2xl font-black text-white tabular-nums tracking-wider">
@@ -1050,7 +1164,7 @@ export default function HubSection({
                               </div>
 
                               {/* Team B */}
-                              <div className={`flex-1 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamB.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
+                              <div className={`flex-1 min-w-0 text-center p-2.5 sm:p-4 rounded-2xl bg-white/[0.04] border flex flex-col items-center justify-center ${match.winner === match.teamB.rw ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10'}`}>
                                 {match.teamB.logo ? (
                                   <div className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden bg-white p-1 border-2 border-white/25 shadow-lg mb-2 sm:mb-3 flex items-center justify-center">
                                     <RwLogoImage
@@ -1064,8 +1178,8 @@ export default function HubSection({
                                     <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
                                   </div>
                                 )}
-                                <p className="text-base sm:text-xl font-black text-white tracking-tight">{match.teamB.rw}</p>
-                                <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1">
+                                <p className="text-sm sm:text-xl font-black text-white tracking-tight truncate w-full">{match.teamB.rw}</p>
+                                <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1 w-full">
                                   {match.teamB.name || 'Dusun II Wanajaya'}
                                 </p>
                               </div>
@@ -1132,7 +1246,7 @@ export default function HubSection({
                                   {match.tableTennisMatches.map((p) => (
                                     <div
                                       key={p.partai}
-                                      className="rounded-xl bg-white/[0.04] border border-white/10 py-2 px-2.5 text-center"
+                                      className="last:col-span-2 sm:last:col-span-1 rounded-xl bg-white/[0.04] border border-white/10 py-2 px-2.5 text-center"
                                     >
                                       <span className="block text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
                                         {p.label}
@@ -1198,8 +1312,8 @@ export default function HubSection({
                               )}
 
                             {/* Meta Footer (Time only, no date next to time + Quick Input Skor in Hasil tab) */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 mt-3 border-t border-white/10 text-xs text-slate-300">
-                              <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 mt-3 border-t border-white/10 text-xs text-slate-300">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <div className="flex items-center gap-1.5">
                                   <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                                   <span className="font-semibold text-white">{match.time}</span>
@@ -1209,15 +1323,27 @@ export default function HubSection({
                                   <span className="font-semibold text-emerald-300">{match.venue}</span>
                                 </div>
                               </div>
-                              {activeTab === 'hasil' && isAdmin && (
-                                <button
-                                  type="button"
-                                  onClick={() => openResultFormForMatch(match.id)}
-                                  className="min-h-[40px] px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-xs font-semibold text-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
-                                >
-                                  <ClipboardEdit className="w-3.5 h-3.5" />
-                                  <span>{match.status === 'Segera' ? 'Input Skor' : 'Edit Skor'}</span>
-                                </button>
+                              {isAdmin && (
+                                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditScheduleForMatch(match.id)}
+                                    className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[40px] px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-xs font-semibold text-cyan-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    <span>Edit Jadwal</span>
+                                  </button>
+                                  {activeTab === 'hasil' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openResultFormForMatch(match.id)}
+                                      className="flex-1 sm:flex-none min-h-[44px] sm:min-h-[40px] px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-400/30 text-xs font-semibold text-emerald-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+                                    >
+                                      <ClipboardEdit className="w-3.5 h-3.5" />
+                                      <span>{match.status === 'Segera' ? 'Input Skor' : 'Edit Skor'}</span>
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1241,7 +1367,7 @@ export default function HubSection({
                       </p>
                       <nav
                         aria-label="Pagination jadwal per tanggal"
-                        className="flex flex-wrap items-center gap-1"
+                        className="flex flex-wrap items-center gap-1.5 sm:gap-1"
                       >
                         <button
                           type="button"
@@ -1249,7 +1375,7 @@ export default function HubSection({
                           disabled={safeDatePage <= 1}
                           aria-label="Tanggal sebelumnya"
                           title="Tanggal sebelumnya"
-                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -1265,7 +1391,7 @@ export default function HubSection({
                               aria-current={isCurrent ? 'page' : undefined}
                               aria-label={`Halaman ${pageNum}: ${dateLabel}`}
                               title={dateLabel}
-                              className={`min-h-[40px] min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
+                              className={`min-h-[44px] min-w-[40px] sm:min-h-[40px] sm:min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
                                 isCurrent
                                   ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
                                   : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
@@ -1282,7 +1408,7 @@ export default function HubSection({
                           disabled={safeDatePage >= totalDatePages}
                           aria-label="Tanggal berikutnya"
                           title="Tanggal berikutnya"
-                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
@@ -1370,8 +1496,8 @@ export default function HubSection({
                   <div className="space-y-6">
                     {/* Bola Voli Putra */}
                     {showSport('Voli Putra') && (
-                      <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                        <div className="flex items-center justify-between gap-2">
+                      <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <h5 className="text-sm sm:text-base font-bold text-cyan-300">
                             Klasemen Bola Voli Putra
                           </h5>
@@ -1398,8 +1524,8 @@ export default function HubSection({
 
                     {/* Bulu Tangkis */}
                     {showSport('Bulu Tangkis') && (
-                      <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                        <div className="flex items-center justify-between gap-2">
+                      <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <h5 className="text-sm sm:text-base font-bold text-cyan-300">
                             Klasemen Bulu Tangkis
                           </h5>
@@ -1426,8 +1552,8 @@ export default function HubSection({
 
                     {/* Tenis Meja */}
                     {showSport('Tenis Meja') && (
-                      <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                        <div className="flex items-center justify-between gap-2">
+                      <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <h5 className="text-sm sm:text-base font-bold text-emerald-300">
                             Klasemen Tenis Meja
                           </h5>
@@ -1452,10 +1578,10 @@ export default function HubSection({
 
                     {/* Bola Voli Putri & Futsal Anak */}
                     {(showSport('Voli Putri') || showSport('Futsal Anak')) && (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
                         {showSport('Voli Putri') && (
-                          <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                            <div className="flex items-center justify-between gap-2">
+                          <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <h5 className="text-sm sm:text-base font-bold text-cyan-300">
                                 Klasemen Bola Voli Putri
                               </h5>
@@ -1468,8 +1594,8 @@ export default function HubSection({
                         )}
 
                         {showSport('Futsal Anak') && (
-                          <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
-                            <div className="flex items-center justify-between gap-2">
+                          <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <h5 className="text-sm sm:text-base font-bold text-emerald-300">
                                 Klasemen Futsal Anak
                               </h5>
@@ -1487,7 +1613,7 @@ export default function HubSection({
 
                 {/* Klasemen Medali RW */}
                 <div className="pt-8 border-t border-white/10">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
                     <div>
                       <h4 className="text-lg font-bold text-white">
                         Klasemen Resmi Perolehan Medali Antar RW
@@ -1502,6 +1628,9 @@ export default function HubSection({
                     </div>
                   </div>
 
+                  <p className="sm:hidden text-[11px] text-slate-400 text-right mb-1.5">
+                    Geser tabel ke samping →
+                  </p>
                   {/* Table Container */}
                   <div className="overflow-x-auto rounded-2xl border border-white/10">
                     <table className="w-full min-w-[540px] text-left text-sm text-slate-300">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Navbar from '@/components/Navbar';
+import Navbar, { AdminMenuAction } from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import About from '@/components/About';
 import SportsCategories from '@/components/SportsCategories';
@@ -19,8 +19,8 @@ import { useAdminAuth } from '@/lib/adminAuth';
 export default function HomePage() {
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('jadwal');
   const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [pendingAdminAction, setPendingAdminAction] = useState<'jadwal' | 'hasil' | 'galeri' | null>(null);
-  const [adminPanel, setAdminPanel] = useState<'none' | 'jadwal' | 'hasil'>('none');
+  const [pendingAdminAction, setPendingAdminAction] = useState<AdminMenuAction | null>(null);
+  const [adminPanel, setAdminPanel] = useState<'none' | 'jadwal' | 'edit-jadwal' | 'hasil'>('none');
   const [galleryUploadOpen, setGalleryUploadOpen] = useState(false);
   const { isAdmin, login, logout } = useAdminAuth();
 
@@ -38,21 +38,30 @@ export default function HomePage() {
     scrollToSection('hub-content-view');
   };
 
-  const handleRequestAdminLogin = (intent?: 'jadwal' | 'hasil' | 'galeri') => {
+  const handleRequestAdminLogin = (intent?: AdminMenuAction) => {
     setPendingAdminAction(intent ?? null);
     setLoginModalOpen(true);
   };
 
-  const handleLoginSuccess = () => {
-    if (pendingAdminAction === 'jadwal') {
+  const handleOpenAdminAction = (action: AdminMenuAction) => {
+    if (action === 'jadwal') {
       setAdminPanel('jadwal');
       scrollToHubTab('jadwal');
-    } else if (pendingAdminAction === 'hasil') {
+    } else if (action === 'edit-jadwal') {
+      setAdminPanel('edit-jadwal');
+      scrollToHubTab('jadwal');
+    } else if (action === 'hasil') {
       setAdminPanel('hasil');
       scrollToHubTab('hasil');
-    } else if (pendingAdminAction === 'galeri') {
+    } else if (action === 'galeri') {
       setGalleryUploadOpen(true);
       scrollToSection('galeri');
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    if (pendingAdminAction) {
+      handleOpenAdminAction(pendingAdminAction);
     }
     setPendingAdminAction(null);
   };
@@ -66,11 +75,13 @@ export default function HomePage() {
   const loginModalSubtitle =
     pendingAdminAction === 'jadwal'
       ? 'Masuk sebagai admin untuk membuka Form Input Jadwal Pertandingan.'
-      : pendingAdminAction === 'hasil'
-        ? 'Masuk sebagai admin untuk membuka Form Input Hasil Pertandingan.'
-        : pendingAdminAction === 'galeri'
-          ? 'Masuk sebagai admin untuk mengunggah foto ke Galeri.'
-          : 'Masuk sebagai panitia admin untuk mengelola input jadwal, hasil pertandingan, dan galeri.';
+      : pendingAdminAction === 'edit-jadwal'
+        ? 'Masuk sebagai admin untuk mengedit Jadwal Pertandingan.'
+        : pendingAdminAction === 'hasil'
+          ? 'Masuk sebagai admin untuk membuka Form Input Hasil Pertandingan.'
+          : pendingAdminAction === 'galeri'
+            ? 'Masuk sebagai admin untuk mengunggah foto ke Galeri.'
+            : 'Masuk sebagai panitia admin untuk mengelola input & edit jadwal, hasil pertandingan, dan galeri.';
 
   return (
     <div className="relative min-h-screen bg-[#070913] text-slate-100 flex flex-col pb-20 md:pb-0 selection:bg-cyan-500/30 selection:text-cyan-200">
@@ -80,6 +91,7 @@ export default function HomePage() {
         onOpenRulesModal={scrollToRules}
         isAdmin={isAdmin}
         onOpenLoginModal={() => handleRequestAdminLogin()}
+        onOpenAdminAction={handleOpenAdminAction}
         onLogoutAdmin={handleLogoutAdmin}
       />
 

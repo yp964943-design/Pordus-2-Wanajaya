@@ -234,26 +234,26 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
   };
 
   return (
-    <section id="komentar" className="py-10 md:py-12 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="glass-card rounded-3xl border border-white/15 p-6 sm:p-10">
+    <section id="komentar" className="py-8 md:py-12 relative">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="glass-card rounded-3xl border border-white/15 p-4 sm:p-10">
           <div className="max-w-2xl">
             <p className="text-xs font-bold tracking-widest text-cyan-400 uppercase">
               Suara &amp; Dukungan Warga
             </p>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white mt-2 text-balance">
+            <h3 className="text-xl sm:text-3xl font-extrabold text-white mt-2 text-balance">
               Komentar &amp; Dukungan Turnamen
             </h3>
-            <p className="mt-2.5 text-sm text-slate-300">
+            <p className="mt-2 sm:mt-2.5 text-sm text-slate-300">
               Bagikan semangat, dukungan untuk kontingen RW favorit Anda, atau masukan bagi panitia PORDUS 2 Wanajaya Ke-IV 2026.
             </p>
           </div>
 
-          <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          <div className="mt-6 sm:mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
             {/* Form Komentar */}
             <form
               onSubmit={handleSubmit}
-              className="lg:col-span-5 rounded-2xl bg-white/[0.03] border border-white/10 p-5 sm:p-6 space-y-4"
+              className="lg:col-span-5 rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-6 space-y-4"
             >
               <div>
                 <label
@@ -487,7 +487,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
 
                         {/* Replies List */}
                         {replies.length > 0 && (
-                          <div className="mt-3.5 pl-3 sm:pl-5 space-y-2.5">
+                          <div className="mt-3.5 pl-2.5 sm:pl-5 space-y-2.5">
                             {replies.map((reply) => (
                               <div
                                 key={reply.id}
@@ -511,7 +511,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                                       onClick={() => openReplyForm(item.id, reply.name)}
                                       aria-label={`Balas ${reply.name}`}
                                       title={`Balas ${reply.name}`}
-                                      className="min-h-[32px] px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                      className="min-h-[44px] sm:min-h-[32px] px-2.5 sm:px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
                                     >
                                       Balas
                                     </button>
@@ -522,7 +522,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                                             type="button"
                                             disabled={deletingId === reply.id}
                                             onClick={() => handleDelete(reply.id)}
-                                            className="min-h-[36px] sm:min-h-[32px] px-2 rounded-lg bg-rose-500/25 hover:bg-rose-500/35 border border-rose-400/40 text-[11px] font-bold text-rose-200 transition-colors cursor-pointer disabled:opacity-50"
+                                            className="min-h-[44px] sm:min-h-[32px] px-2.5 sm:px-2 rounded-lg bg-rose-500/25 hover:bg-rose-500/35 border border-rose-400/40 text-xs sm:text-[11px] font-bold text-rose-200 transition-colors cursor-pointer disabled:opacity-50"
                                           >
                                             {deletingId === reply.id ? '...' : 'Hapus'}
                                           </button>
@@ -530,7 +530,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                                             type="button"
                                             disabled={deletingId === reply.id}
                                             onClick={() => setConfirmDeleteId(null)}
-                                            className="min-h-[36px] sm:min-h-[32px] px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold text-slate-300 transition-colors cursor-pointer"
+                                            className="min-h-[44px] sm:min-h-[32px] px-2.5 sm:px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-[11px] font-semibold text-slate-300 transition-colors cursor-pointer"
                                           >
                                             Batal
                                           </button>
@@ -541,15 +541,15 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                                           onClick={() => setConfirmDeleteId(reply.id)}
                                           aria-label={`Hapus balasan dari ${reply.name}`}
                                           title="Hapus balasan yang tidak sesuai"
-                                          className="min-w-[40px] min-h-[40px] sm:min-w-[32px] sm:min-h-[32px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/35 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                          className="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/35 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                                         </button>
                                       ))}
                                   </div>
                                 </div>
 
-                                <p className="mt-1.5 pl-5 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line break-words">
+                                <p className="mt-1.5 pl-4 sm:pl-5 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line break-words">
                                   {reply.message}
                                 </p>
                               </div>
@@ -561,7 +561,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                         {isReplyingHere && (
                           <form
                             onSubmit={(e) => handleReplySubmit(e, item.id)}
-                            className="mt-3.5 pl-3 sm:pl-5"
+                            className="mt-3.5 pl-2.5 sm:pl-5"
                           >
                             <div className="rounded-xl bg-[#0a0f24]/80 border border-cyan-400/30 p-3.5 sm:p-4 space-y-3">
                               <div className="flex items-center justify-between gap-2">
@@ -577,9 +577,9 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                                     setReplyError('');
                                   }}
                                   aria-label="Tutup form balasan"
-                                  className="min-w-[32px] min-h-[32px] flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                  className="min-w-[44px] min-h-[44px] sm:min-w-[32px] sm:min-h-[32px] flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                 </button>
                               </div>
 
@@ -666,13 +666,13 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                       <span className="text-xs text-slate-400 tabular-nums">
                         Halaman {safePage} dari {totalPages}
                       </span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 sm:gap-1">
                         <button
                           type="button"
                           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                           disabled={safePage <= 1}
                           aria-label="Komentar sebelumnya"
-                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -681,7 +681,7 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                           onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                           disabled={safePage >= totalPages}
                           aria-label="Komentar berikutnya"
-                          className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>

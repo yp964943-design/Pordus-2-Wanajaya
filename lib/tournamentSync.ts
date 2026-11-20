@@ -3,6 +3,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -86,7 +87,7 @@ function sanitizeTeam(team: MatchItem['teamA']) {
   return clean;
 }
 
-function sanitizeCustomMatchDoc(match: MatchItem) {
+function sanitizeCustomMatchDoc(match: MatchItem, isCustomFlag = true) {
   const payload: Record<string, unknown> = {
     id: String(match.id).slice(0, 128),
     sport: match.sport,
@@ -98,7 +99,7 @@ function sanitizeCustomMatchDoc(match: MatchItem) {
     time: String(match.time).slice(0, 40),
     venue: String(match.venue).slice(0, 120),
     status: match.status,
-    isCustom: true,
+    isCustom: isCustomFlag,
     updatedAt: serverTimestamp(),
   };
   if (match.winner) payload.winner = String(match.winner).slice(0, 40);
@@ -209,6 +210,7 @@ export interface CloudWriteResult {
 
 export function useTournamentSync() {
   const [cloudMatches, setCloudMatches] = useState<MatchItem[]>([]);
+  const [defaultMatchOverrides, setDefaultMatchOverrides] = useState<Record<string, MatchItem>>({});
   const [cloudResults, setCloudResults] = useState<Record<string, MatchResultPayload>>({});
   const [cloudReady, setCloudReady] = useState(false);
 
@@ -231,15 +233,24 @@ export function useTournamentSync() {
     const unsubMatches = onSnapshot(
       collection(db, 'custom_matches'),
       (snapshot) => {
-        const items: MatchItem[] = snapshot.docs.map((d) => {
+        const nextCustom: MatchItem[] = [];
+        const nextOverrides: Record<string, MatchItem> = {};
+        snapshot.docs.forEach((d) => {
           const data = d.data() as Record<string, unknown>;
-          return {
+          const isCustomFlag = data.isCustom !== false;
+          const mapped: MatchItem = {
             ...(data as unknown as MatchItem),
             id: d.id,
-            isCustom: true,
+            isCustom: isCustomFlag,
           };
+          if (isCustomFlag) {
+            nextCustom.push(mapped);
+          } else {
+            nextOverrides[d.id] = mapped;
+          }
         });
-        setCloudMatches(items);
+        setCloudMatches(nextCustom);
+        setDefaultMatchOverrides(nextOverrides);
         setCloudReady(true);
       },
       (error) => {
@@ -331,7 +342,7 @@ export function useTournamentSync() {
     return { ...cloudResults, ...pending };
   }, [cloudResults, pendingResultsJson]);
 
-  return { customMatches, resultOverrides, cloudReady };
+  return { customMatches, defaultMatchOverrides, resultOverrides, cloudReady };
 }
 
 export function useGallerySync() {
@@ -422,7 +433,7 @@ export function useGallerySync() {
 export async function saveCustomMatch(match: MatchItem): Promise<CloudWriteResult> {
   const docPath = `custom_matches/${match.id}`;
   try {
-    await setDoc(doc(db, 'custom_matches', match.id), sanitizeCustomMatchDoc(match));
+    await setDoc(doc(db, 'custom_matches', match.id), sanitizeCustomMatchDoc(match, true));
     const current = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
     if (current.some((m) => m.id === match.id)) {
       writeStorageRaw(
@@ -440,6 +451,97 @@ export async function saveCustomMatch(match: MatchItem): Promise<CloudWriteResul
         syncedToCloud: false,
         errorMessage:
           wrapped instanceof Error ? wrapped.message : 'Gagal menyinkronkan jadwal ke cloud.',
+      };
+    }
+  }
+}
+
+export async function updateMatchSchedule(match: MatchItem): Promise<CloudWriteResult> {
+  const cleanId = String(match.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
+  if (!cleanId) {
+    return {
+      syncedToCloud: false,
+      errorMessage: 'ID pertandingan tidak valid.',
+    };
+  }
+
+  const normalizedMatch: MatchItem = {
+    ...match,
+    id: cleanId,
+  };
+  const docPath = `custom_matches/${cleanId}`;
+  const docRef = doc(db, 'custom_matches', cleanId);
+
+  try {
+    const snap = await getDoc(docRef);
+    const fullPayload = sanitizeCustomMatchDoc(normalizedMatch, Boolean(normalizedMatch.isCustom));
+
+    if (snap.exists()) {
+      const existingData = snap.data() as Record<string, unknown>;
+      const updatePayload: Record<string, unknown> = {
+        sport: fullPayload.sport,
+        category: fullPayload.category,
+        round: fullPayload.round,
+        teamA: fullPayload.teamA,
+        teamB: fullPayload.teamB,
+        date: fullPayload.date,
+        time: fullPayload.time,
+        venue: fullPayload.venue,
+        status: fullPayload.status,
+        updatedAt: serverTimestamp(),
+      };
+
+      const optionalKeys = [
+        'winner',
+        'sets',
+        'badmintonDoubles',
+        'tableTennisMatches',
+        'futsalGoalScorers',
+      ] as const;
+
+      optionalKeys.forEach((key) => {
+        if (key in fullPayload) {
+          updatePayload[key] = fullPayload[key];
+        } else if (key in existingData) {
+          updatePayload[key] = deleteField();
+        }
+      });
+
+      await updateDoc(docRef, updatePayload);
+    } else {
+      await setDoc(docRef, fullPayload);
+    }
+
+    const resultRef = doc(db, 'match_results', cleanId);
+    const resultSnap = await getDoc(resultRef);
+    if (resultSnap.exists()) {
+      const resultData = resultSnap.data() as Record<string, unknown>;
+      if (resultData.status !== normalizedMatch.status) {
+        await updateDoc(resultRef, {
+          status: normalizedMatch.status,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+
+    const currentPending = readStorageJson<MatchItem[]>(PENDING_MATCHES_KEY, []);
+    if (currentPending.some((m) => m.id === cleanId)) {
+      writeStorageRaw(
+        PENDING_MATCHES_KEY,
+        PENDING_MATCHES_EVENT,
+        currentPending.filter((m) => m.id !== cleanId)
+      );
+    }
+
+    return { syncedToCloud: true };
+  } catch (error) {
+    try {
+      handleFirestoreError(error, OperationType.UPDATE, docPath);
+    } catch (wrapped) {
+      return {
+        syncedToCloud: false,
+        errorMessage:
+          wrapped instanceof Error ? wrapped.message : 'Gagal memperbarui jadwal di cloud.',
       };
     }
   }

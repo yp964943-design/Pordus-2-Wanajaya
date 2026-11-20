@@ -16,7 +16,7 @@ export default function AdminLoginModal({
   onClose,
   onLogin,
   onSuccess,
-  subtitle = 'Masuk sebagai panitia admin untuk mengelola input jadwal, hasil pertandingan, dan galeri.',
+  subtitle = 'Masuk sebagai panitia admin untuk mengelola input & edit jadwal, hasil pertandingan, dan galeri.',
 }: AdminLoginModalProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

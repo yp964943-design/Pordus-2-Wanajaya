@@ -29,40 +29,40 @@ export default function About() {
   ];
 
   return (
-    <section id="tentang" className="py-10 md:py-12 relative">
+    <section id="tentang" className="py-8 md:py-12 relative">
       {/* Background soft glow */}
       <div className="absolute top-1/2 left-0 w-96 h-96 bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none -z-10" />
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-7 sm:mb-10">
           <span className="text-xs font-bold tracking-widest text-cyan-400 uppercase">
             Membangun Sportivitas & Kebersamaan Warga Dusun II
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
             TENTANG ACARA
           </h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-4 rounded-full" />
+          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
           
           {/* Exact Verbatim Text from User Attachment */}
-          <div className="mt-6 glass-card rounded-3xl p-6 sm:p-8 border border-white/15 relative overflow-hidden text-left sm:text-center">
-            <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal">
+          <div className="mt-5 sm:mt-6 glass-card rounded-3xl p-4 sm:p-8 border border-white/15 relative overflow-hidden text-left sm:text-center">
+            <p className="text-sm sm:text-lg text-slate-200 leading-relaxed font-normal">
               <span className="font-bold text-white">PORDUS 2 WANAJAYA KE-IV</span> adalah ajang turnamen olahraga tahunan yang mempertemukan para atlet dan warga dari <span className="text-cyan-300 font-semibold">12 Rukun Warga (RW)</span> di lingkungan Dusun 2 Wanajaya, bertempat di <span className="text-white font-semibold">RW 017 Pesona Gading Cibitung</span> sebagai tuan rumah. Acara ini bertujuan untuk mempererat tali silaturahmi, menumbuhkan semangat sportivitas, serta mencari bibit unggul olahraga di tingkat dusun.
             </p>
             
-            <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">
+            <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-white/10 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-center gap-2.5 sm:gap-6 text-xs text-slate-400">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-cyan-400" />
+                <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Desa Wanajaya, Kecamatan Cibitung, Bekasi</span>
               </div>
               <div className="flex items-center gap-2">
-                <HeartHandshake className="w-4 h-4 text-emerald-400" />
+                <HeartHandshake className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Edisi Ke-4 · Tahun 2026</span>
               </div>
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>Gotong Royong & Pesta Rakyat</span>
               </div>
             </div>
@@ -70,17 +70,17 @@ export default function About() {
         </div>
 
         {/* 3 Pillars Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
           {pillars.map((pillar) => {
             const IconComponent = pillar.icon;
             return (
               <div
                 key={pillar.title}
-                className="glass-card glass-card-hover rounded-2xl p-6 sm:p-8 border border-white/15 relative flex flex-col justify-between"
+                className="glass-card glass-card-hover rounded-2xl p-5 sm:p-8 border border-white/15 relative flex flex-col justify-between"
               >
                 <div>
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${pillar.gradient} border border-white/15 flex items-center justify-center mb-5`}>
-                    <IconComponent className={`w-6 h-6 ${pillar.iconColor}`} />
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${pillar.gradient} border border-white/15 flex items-center justify-center mb-4 sm:mb-5`}>
+                    <IconComponent className={`w-5 h-5 sm:w-6 sm:h-6 ${pillar.iconColor}`} />
                   </div>
                   <h3 className="text-xl font-bold text-white tracking-tight mb-2">
                     {pillar.title}

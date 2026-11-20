@@ -13,25 +13,25 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
   const [selectedSport, setSelectedSport] = useState<SportItem | null>(null);
 
   return (
-    <section id="cabang-lomba" className="py-10 md:py-12 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="cabang-lomba" className="py-8 md:py-12 relative">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
         
         {/* Section Header verbatim from PDF */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-7 sm:mb-10">
           <span className="text-xs font-bold tracking-widest text-emerald-400 uppercase">
             Cabang Olahraga Yang Dipertandingkan
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
             CABANG LOMBA
           </h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 mx-auto mt-4 rounded-full" />
-          <p className="mt-4 text-sm sm:text-base text-slate-300">
+          <div className="w-16 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
+          <p className="mt-3.5 sm:mt-4 text-sm sm:text-base text-slate-300">
             Empat cabang olahraga utama yang memperebutkan medali dan supremasi bergengsi antar RW Dusun II Wanajaya.
           </p>
         </div>
 
         {/* 4 Sports Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-7">
           {SPORTS_LIST.map((sport) => (
             <div
               key={sport.id}
@@ -39,7 +39,7 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
             >
               <div>
                 {/* Visual Image container with Glass Border */}
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-900">
+                <div className="relative aspect-[16/10] sm:aspect-[4/3] w-full overflow-hidden bg-slate-900">
                   <Image
                     src={sport.image}
                     alt={`Cabang Olahraga ${sport.name} PORDUS Wanajaya`}
@@ -50,7 +50,7 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
                   <div className="absolute inset-0 bg-gradient-to-t from-[#070913] via-transparent to-black/30" />
                   
                   {/* Badge */}
-                  <div className="absolute top-4 left-4">
+                  <div className="absolute top-3 left-3 sm:top-4 sm:left-4">
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-black/60 backdrop-blur-md text-cyan-300 border border-white/20">
                       {sport.category}
                     </span>
@@ -58,10 +58,10 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
-                  <h3 className="text-2xl font-black text-white tracking-tight flex items-center justify-between">
+                <div className="p-4 sm:p-6">
+                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center justify-between gap-2">
                     <span>{sport.name}</span>
-                    <span className="text-xs font-normal text-slate-400">{sport.category}</span>
+                    <span className="text-xs font-normal text-slate-400 shrink-0">{sport.category}</span>
                   </h3>
                   <p className="mt-3 text-sm text-slate-300 line-clamp-2 leading-relaxed">
                     {sport.description}
@@ -81,12 +81,12 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
               </div>
 
               {/* Action Buttons */}
-              <div className="p-5 sm:p-6 pt-0 flex items-center gap-3">
+              <div className="p-4 sm:p-6 pt-0 flex items-center gap-2.5 sm:gap-3">
                 <button
                   onClick={() => setSelectedSport(sport)}
-                  className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl glass-card text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 border border-white/15 transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 min-h-[44px] py-2.5 px-3.5 sm:px-4 rounded-xl glass-card text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/10 border border-white/15 transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Info className="w-3.5 h-3.5 text-cyan-400" />
+                  <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span>Detail & Aturan</span>
                 </button>
                 <button
@@ -103,10 +103,16 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
 
       </div>
 
-      {/* Sport Detail Modal */}
+      {/* Sport Detail Modal (Bottom sheet on mobile) */}
       {selectedSport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-white/20 p-5 sm:p-8 max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={() => setSelectedSport(null)}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full sm:max-w-2xl glass-card rounded-t-3xl sm:rounded-3xl border border-white/20 p-5 sm:p-8 max-h-[90dvh] overflow-y-auto"
+          >
             {/* Close button */}
             <button
               onClick={() => setSelectedSport(null)}
@@ -173,10 +179,10 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
               </ul>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-end gap-3">
+            <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-white/10 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3">
               <button
                 onClick={() => setSelectedSport(null)}
-                className="px-5 py-2.5 rounded-xl bg-white/10 text-xs font-semibold text-slate-200 hover:bg-white/15 transition-all"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-white/10 text-xs font-semibold text-slate-200 hover:bg-white/15 transition-all cursor-pointer"
               >
                 Tutup
               </button>
@@ -185,7 +191,7 @@ export default function SportsCategories({ onViewSchedule }: SportsCategoriesPro
                   setSelectedSport(null);
                   onViewSchedule();
                 }}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 text-xs font-bold hover:shadow-lg transition-all"
+                className="min-h-[44px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 text-xs font-bold hover:shadow-lg transition-all cursor-pointer"
               >
                 Lihat Jadwal {selectedSport.name}
               </button>

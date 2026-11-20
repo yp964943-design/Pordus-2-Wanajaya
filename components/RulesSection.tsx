@@ -42,25 +42,25 @@ export default function RulesSection() {
   };
 
   return (
-    <section id="peraturan" className="py-10 md:py-12 relative">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="peraturan" className="py-8 md:py-12 relative">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-7 sm:mb-10">
           <span className="text-xs font-bold tracking-widest text-emerald-400 uppercase">
             Ringkasan Panduan Teknis & Regulasi Resmi
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
             PERATURAN PERTANDINGAN
           </h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 mx-auto mt-4 rounded-full" />
-          <p className="mt-4 text-sm sm:text-base text-slate-300">
+          <div className="w-16 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
+          <p className="mt-3.5 sm:mt-4 text-sm sm:text-base text-slate-300">
             Intisari BAB I–VI (Pasal 1–20) Panduan Teknis dan Peraturan Pertandingan Komite Olahraga Dusun II Wanajaya.
           </p>
         </div>
 
         {/* Quick Requirement & Official PDF Download Callout */}
-        <div className="glass-card rounded-2xl p-6 border border-emerald-500/25 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="glass-card rounded-2xl p-4 sm:p-6 border border-emerald-500/25 mb-5 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
               <FileCheck className="w-6 h-6" />
@@ -150,18 +150,18 @@ export default function RulesSection() {
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
-                  className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  className="w-full p-4 sm:p-6 text-left flex items-center justify-between gap-3 sm:gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
                 >
-                  <span className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  <span className="text-sm sm:text-lg font-bold text-white tracking-tight">
                     {section.title}
                   </span>
-                  <div className="p-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 shrink-0">
+                  <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 shrink-0">
                     {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="p-5 sm:p-6 pt-0 border-t border-white/5">
+                  <div className="p-4 sm:p-6 pt-0 border-t border-white/5">
                     <ul className="space-y-3 text-sm text-slate-300 mt-4">
                       {section.points.map((point, idx) => (
                         <li key={idx} className="flex items-start gap-3">

@@ -11,13 +11,13 @@ interface HeroProps {
 
 export default function Hero({ onOpenSchedule, onOpenResults }: HeroProps) {
   return (
-    <section id="beranda" className="relative pt-5 pb-8 md:pt-10 md:pb-12 overflow-hidden">
+    <section id="beranda" className="relative pt-4 pb-6 md:pt-10 md:pb-12 overflow-hidden">
       {/* Ambient Glassmorphic Background Orbs */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] md:w-[900px] h-[350px] md:h-[500px] bg-gradient-to-tr from-cyan-600/20 via-teal-500/15 to-emerald-500/20 rounded-full blur-[120px] pointer-events-none -z-10" />
       <div className="absolute top-10 left-10 w-72 h-72 bg-blue-600/15 rounded-full blur-[90px] pointer-events-none -z-10" />
       <div className="absolute top-40 right-10 w-80 h-80 bg-emerald-600/15 rounded-full blur-[100px] pointer-events-none -z-10" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
         
         {/* Top Trust Marker / Official PORDUS Logo */}
         <div className="flex flex-col items-center text-center mb-4">
@@ -88,27 +88,27 @@ export default function Hero({ onOpenSchedule, onOpenResults }: HeroProps) {
 
           {/* Glass Stats Bar: Cleanly stacked below poster so full event poster remains unobstructed */}
           <div className="mt-2.5 sm:mt-3">
-            <div className="backdrop-blur-xl bg-[#070913]/85 border border-white/15 rounded-2xl p-3.5 sm:p-5 md:p-6 shadow-2xl">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5 md:gap-6 md:divide-x divide-white/10">
-                <div className="md:px-3 text-center md:text-left">
+            <div className="backdrop-blur-xl bg-[#070913]/85 border border-white/15 rounded-2xl p-2.5 sm:p-5 md:p-6 shadow-2xl">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-5 md:gap-6 md:divide-x divide-white/10">
+                <div className="rounded-xl md:rounded-none bg-white/[0.03] md:bg-transparent p-2.5 md:p-0 md:px-3 text-center md:text-left">
                   <p className="text-[11px] sm:text-xs text-cyan-300 font-medium tracking-wider uppercase">Wilayah Dusun</p>
                   <p className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1 tabular-nums">12 RW</p>
-                  <p className="text-[11px] text-slate-400">Dusun II Desa Wanajaya</p>
+                  <p className="text-[11px] text-slate-400 leading-tight">Dusun II Desa Wanajaya</p>
                 </div>
-                <div className="md:px-3 text-center md:text-left">
+                <div className="rounded-xl md:rounded-none bg-white/[0.03] md:bg-transparent p-2.5 md:p-0 md:px-3 text-center md:text-left">
                   <p className="text-[11px] sm:text-xs text-teal-300 font-medium tracking-wider uppercase">Cabang Lomba</p>
                   <p className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1">4 Cabor</p>
-                  <p className="text-[11px] text-slate-400">Voli · Bulu Tangkis · Tenis Meja · Futsal</p>
+                  <p className="text-[11px] text-slate-400 leading-tight">Voli · Badminton · Tenis Meja · Futsal</p>
                 </div>
-                <div className="md:px-3 text-center md:text-left">
+                <div className="rounded-xl md:rounded-none bg-white/[0.03] md:bg-transparent p-2.5 md:p-0 md:px-3 text-center md:text-left">
                   <p className="text-[11px] sm:text-xs text-emerald-300 font-medium tracking-wider uppercase">Partisipan</p>
                   <p className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1 tabular-nums">200+ Atlet</p>
-                  <p className="text-[11px] text-slate-400">Warga Lokal Terdaftar</p>
+                  <p className="text-[11px] text-slate-400 leading-tight">Warga Lokal Terdaftar</p>
                 </div>
-                <div className="md:px-3 text-center md:text-left">
+                <div className="rounded-xl md:rounded-none bg-white/[0.03] md:bg-transparent p-2.5 md:p-0 md:px-3 text-center md:text-left">
                   <p className="text-[11px] sm:text-xs text-amber-300 font-medium tracking-wider uppercase">Gelar Kehormatan</p>
                   <p className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1">Piala Bergilir</p>
-                  <p className="text-[11px] text-slate-400">Juara Umum Dusun II</p>
+                  <p className="text-[11px] text-slate-400 leading-tight">Juara Umum Dusun II</p>
                 </div>
               </div>
             </div>

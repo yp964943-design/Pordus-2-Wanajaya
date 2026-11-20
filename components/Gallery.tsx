@@ -370,26 +370,26 @@ export default function Gallery({
   ];
 
   return (
-    <section id="galeri" className="py-10 md:py-12 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="galeri" className="py-8 md:py-12 relative">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
 
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
+        <div className="text-center max-w-3xl mx-auto mb-7 sm:mb-10">
           <span className="text-xs font-bold tracking-widest text-cyan-400 uppercase">
             Momen Kebersamaan & Dokumentasi Laga
           </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white mt-2 tracking-tight">
             GALERI
           </h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-4 rounded-full" />
-          <p className="mt-4 text-sm sm:text-base text-slate-300">
+          <div className="w-16 h-1 bg-gradient-to-r from-cyan-400 to-emerald-400 mx-auto mt-3.5 sm:mt-4 rounded-full" />
+          <p className="mt-3.5 sm:mt-4 text-sm sm:text-base text-slate-300">
             Rekaman aksi heroik, perjuangan atlet, gemuruh supporter warga, dan selebrasi juara turnamen PORDUS 2 Wanajaya.
           </p>
         </div>
 
-        {/* Dropdown Controls (Kategori, Tanggal, Pilih Foto) + View Switcher + Upload Galeri CTA */}
-        <div className="flex flex-col gap-3.5 sm:gap-4 mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Dropdown Controls (Kategori, Tanggal, Pilih Foto) + Upload Galeri CTA */}
+        <div className="flex flex-col gap-3 sm:gap-4 mb-5 sm:mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
             {/* Category Filter Dropdown */}
             <div className="flex flex-col gap-1.5">
               <label
@@ -450,7 +450,7 @@ export default function Gallery({
             </div>
 
             {/* Direct Photo Selector Dropdown */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+            <div className="flex flex-col gap-1.5 col-span-2 lg:col-span-1">
               <label
                 htmlFor="gallery-photo-select"
                 className="text-xs text-slate-400 flex items-center gap-1.5 whitespace-nowrap"
@@ -594,7 +594,7 @@ export default function Gallery({
                       className="object-cover"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#070913]/95 via-[#070913]/40 to-black/25" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#070913]/65 sm:from-[#070913]/95 via-transparent sm:via-[#070913]/40 to-black/25" />
                   </motion.div>
                 </AnimatePresence>
 
@@ -708,20 +708,35 @@ export default function Gallery({
                   </>
                 )}
 
-                {/* Caption Overlay with Clean Unboxed Metadata */}
-                <div className="absolute bottom-4 left-4 right-4 sm:bottom-7 sm:left-8 sm:right-8 z-10 pointer-events-none">
+                {/* Desktop & Tablet Caption Overlay */}
+                <div className="hidden sm:block absolute bottom-7 left-8 right-8 z-10 pointer-events-none">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-300 font-semibold mb-1.5">
                     <span>{activeSlideItem.category}</span>
                     <span className="text-slate-400" aria-hidden="true">·</span>
                     <span className="text-slate-300 font-normal">{activeSlideItem.date}</span>
                   </div>
-                  <h3 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight max-w-3xl">
+                  <h3 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight max-w-3xl">
                     {activeSlideItem.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-200 mt-1.5 max-w-2xl line-clamp-2">
+                  <p className="text-sm text-slate-200 mt-1.5 max-w-2xl line-clamp-2">
                     {activeSlideItem.caption}
                   </p>
                 </div>
+              </div>
+
+              {/* Mobile Caption Block Below Image (keeps mobile stage clean and unobstructed) */}
+              <div className="sm:hidden p-4 bg-[#080d1e]/95 border-t border-white/10">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-cyan-300 font-semibold mb-1">
+                  <span>{activeSlideItem.category}</span>
+                  <span className="text-slate-500" aria-hidden="true">·</span>
+                  <span className="text-slate-300 font-normal">{activeSlideItem.date}</span>
+                </div>
+                <h3 className="text-base font-extrabold text-white tracking-tight leading-snug">
+                  {activeSlideItem.title}
+                </h3>
+                <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                  {activeSlideItem.caption}
+                </p>
               </div>
             </div>
 
@@ -835,7 +850,7 @@ export default function Gallery({
                         disabled={safeAlbumPage <= 1}
                         aria-label="Halaman sebelumnya"
                         title="Halaman sebelumnya"
-                        className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                        className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
@@ -850,7 +865,7 @@ export default function Gallery({
                             onClick={() => handleAlbumPageChange(pageNum)}
                             aria-current={isCurrent ? 'page' : undefined}
                             aria-label={`Halaman ${pageNum}`}
-                            className={`min-h-[40px] min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
+                            className={`min-h-[44px] min-w-[40px] sm:min-h-[40px] sm:min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
                               isCurrent
                                 ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
                                 : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
@@ -867,7 +882,7 @@ export default function Gallery({
                         disabled={safeAlbumPage >= totalAlbumPages}
                         aria-label="Halaman berikutnya"
                         title="Halaman berikutnya"
-                        className="min-h-[40px] min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
+                        className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -885,17 +900,17 @@ export default function Gallery({
       {activeLightboxPhoto && (
         <div
           onClick={() => setActivePhotoId(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-4xl glass-card rounded-3xl border border-white/20 p-3 sm:p-6 overflow-hidden"
+            className="relative w-full max-w-4xl glass-card rounded-3xl border border-white/20 p-2.5 sm:p-6 overflow-hidden max-h-[94dvh] overflow-y-auto"
           >
             <button
               type="button"
               onClick={() => setActivePhotoId(null)}
               aria-label="Tutup tampilan foto"
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/65 hover:bg-black/90 text-white transition-colors border border-white/20 cursor-pointer"
+              className="absolute top-3.5 right-3.5 sm:top-6 sm:right-6 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/65 hover:bg-black/90 text-white transition-colors border border-white/20 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -955,7 +970,7 @@ export default function Gallery({
               )}
             </div>
 
-            <div className="p-4 sm:p-6">
+            <div className="p-3.5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-cyan-300">
@@ -969,7 +984,7 @@ export default function Gallery({
                     <button
                       type="button"
                       onClick={() => handleOpenEditPhoto(activeLightboxPhoto)}
-                      className="min-h-[38px] px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 text-xs font-semibold text-cyan-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="min-h-[44px] sm:min-h-[38px] px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/35 text-xs font-semibold text-cyan-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span>Edit Keterangan</span>
@@ -980,10 +995,10 @@ export default function Gallery({
                   </span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold text-white">
+              <h3 className="text-lg sm:text-2xl font-bold text-white">
                 {activeLightboxPhoto.title}
               </h3>
-              <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
                 {activeLightboxPhoto.caption}
               </p>
             </div>
