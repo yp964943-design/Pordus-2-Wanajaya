@@ -4,8 +4,6 @@ import React, { useMemo, useState } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   CornerDownRight,
   MessageSquare,
   Reply,
@@ -15,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { RW_LOGOS } from '@/data/pordusData';
+import CompactPagination from '@/components/CompactPagination';
 import {
   removeComment,
   saveComment,
@@ -33,13 +32,14 @@ const RW_OPTIONS = [...Object.keys(RW_LOGOS), 'Umum / Warga'];
 function formatCommentTimestamp(ts: number): string {
   if (!ts || Number.isNaN(ts)) return 'Baru saja';
   try {
-    return new Intl.DateTimeFormat('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(ts));
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return 'Baru saja';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}-${month}-${year} · ${hours}.${minutes}`;
   } catch {
     return 'Baru saja';
   }
@@ -661,33 +661,21 @@ export default function CommentSection({ isAdmin }: CommentSectionProps) {
                     );
                   })}
 
-                  {totalPages > 1 && (
-                    <div className="pt-2 flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-400 tabular-nums">
-                        Halaman {safePage} dari {totalPages}
-                      </span>
-                      <div className="flex items-center gap-1.5 sm:gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                          disabled={safePage <= 1}
-                          aria-label="Komentar sebelumnya"
-                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                          disabled={safePage >= totalPages}
-                          aria-label="Komentar berikutnya"
-                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <CompactPagination
+                    currentPage={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    ariaLabel="Pagination komentar warga"
+                    prevAriaLabel="Komentar sebelumnya"
+                    nextAriaLabel="Komentar selanjutnya"
+                    info={
+                      <>
+                        Halaman <span className="font-semibold text-slate-200">{safePage}</span> dari{' '}
+                        <span className="font-semibold text-slate-200">{totalPages}</span>
+                      </>
+                    }
+                    className="mt-2"
+                  />
                 </div>
               )}
             </div>

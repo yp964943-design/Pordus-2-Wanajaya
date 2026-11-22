@@ -18,10 +18,13 @@ import {
   Pencil,
   Filter,
   Images,
+  Download,
 } from 'lucide-react';
 import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
 import GalleryEditModal from '@/components/GalleryEditModal';
+import CompactPagination from '@/components/CompactPagination';
+import { compareIndonesianDates, formatDateDDMMYYYY } from '@/lib/matchDateTime';
 import {
   removeGalleryItem,
   saveGalleryItems,
@@ -58,11 +61,16 @@ export default function Gallery({
     const mergedDefaults = GALLERY_ITEMS.map(
       (item) => defaultOverrides[item.id] ?? item
     );
-    return [...customItems, ...mergedDefaults];
+    return [...customItems, ...mergedDefaults].map((item) => ({
+      ...item,
+      date: formatDateDDMMYYYY(item.date),
+    }));
   }, [customItems, defaultOverrides]);
 
   const uniqueDates = useMemo(() => {
-    return Array.from(new Set(allItems.map((item) => item.date)));
+    return Array.from(new Set(allItems.map((item) => item.date))).sort(
+      compareIndonesianDates
+    );
   }, [allItems]);
 
   const { groupedAlbums, orderedItems } = useMemo(() => {
@@ -505,8 +513,18 @@ export default function Gallery({
               Menampilkan <span className="font-semibold text-slate-200">{itemCount}</span> foto dokumentasi
             </p>
 
-            {isAdmin && (
-              <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
+              <a
+                href="https://drive.google.com/drive/folders/1MdSuki7QEtMEIV4Ghg6fOc9vMFapsAPE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 bg-white/5 hover:bg-cyan-500/15 text-cyan-200 hover:text-cyan-100 border border-cyan-400/35 hover:border-cyan-400/60 shadow-sm hover:shadow-[0_0_18px_rgba(34,211,238,0.2)] active:scale-95"
+              >
+                <Download className="w-4 h-4 text-cyan-300 shrink-0" />
+                <span>Unduh Gambar</span>
+              </a>
+
+              {isAdmin && (
                 <button
                   type="button"
                   onClick={() => onToggleUpload(!isUploadOpen)}
@@ -519,8 +537,8 @@ export default function Gallery({
                   <Upload className="w-4 h-4" />
                   <span>{isUploadOpen ? 'Tutup Form Upload' : 'Upload Galeri'}</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -834,60 +852,19 @@ export default function Gallery({
                 </div>
 
                 {!isFilteredView && totalAlbumPages > 1 && (
-                  <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
-                    <p className="text-xs text-slate-400 tabular-nums">
-                      Halaman <span className="font-semibold text-slate-200">{safeAlbumPage}/{totalAlbumPages}</span>
-                      {' · '}
-                      <span>5 kelompok per halaman</span>
-                    </p>
-                    <nav
-                      aria-label="Pagination kelompok galeri slider"
-                      className="flex flex-wrap items-center gap-1"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleAlbumPageChange(safeAlbumPage - 1)}
-                        disabled={safeAlbumPage <= 1}
-                        aria-label="Halaman sebelumnya"
-                        title="Halaman sebelumnya"
-                        className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-
-                      {Array.from({ length: totalAlbumPages }, (_, idx) => {
-                        const pageNum = idx + 1;
-                        const isCurrent = pageNum === safeAlbumPage;
-                        return (
-                          <button
-                            key={pageNum}
-                            type="button"
-                            onClick={() => handleAlbumPageChange(pageNum)}
-                            aria-current={isCurrent ? 'page' : undefined}
-                            aria-label={`Halaman ${pageNum}`}
-                            className={`min-h-[44px] min-w-[40px] sm:min-h-[40px] sm:min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
-                              isCurrent
-                                ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
-                                : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-
-                      <button
-                        type="button"
-                        onClick={() => handleAlbumPageChange(safeAlbumPage + 1)}
-                        disabled={safeAlbumPage >= totalAlbumPages}
-                        aria-label="Halaman berikutnya"
-                        title="Halaman berikutnya"
-                        className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </nav>
-                  </div>
+                  <CompactPagination
+                    currentPage={safeAlbumPage}
+                    totalPages={totalAlbumPages}
+                    onPageChange={handleAlbumPageChange}
+                    ariaLabel="Pagination kelompok galeri slider"
+                    info={
+                      <>
+                        Halaman <span className="font-semibold text-slate-200">{safeAlbumPage}/{totalAlbumPages}</span>
+                        {' · '}
+                        <span>5 kelompok per halaman</span>
+                      </>
+                    }
+                  />
                 )}
               </div>
             )}

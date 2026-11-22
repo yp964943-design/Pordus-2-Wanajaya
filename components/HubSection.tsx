@@ -12,8 +12,6 @@ import {
   Shield,
   CalendarDays,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Award,
   PlusCircle,
   CheckCircle2,
@@ -28,6 +26,7 @@ import {
 import { MATCHES_SCHEDULE, INITIAL_STANDINGS, RW_LOGOS, MatchItem, RWStanding } from '@/data/pordusData';
 import MatchScheduleForm from '@/components/MatchScheduleForm';
 import MatchResultForm, { MatchResultPayload } from '@/components/MatchResultForm';
+import CompactPagination from '@/components/CompactPagination';
 import {
   removeCustomMatch,
   removeMatchResult,
@@ -39,6 +38,7 @@ import {
 import {
   compareIndonesianDates,
   compareMatchesByDateTime,
+  formatDateDDMMYYYY,
   parseMatchTimeMinutes,
 } from '@/lib/matchDateTime';
 
@@ -629,15 +629,18 @@ export default function HubSection({
           name: teamBInfo?.name || match.teamB.name,
           logo: teamBInfo?.logo || match.teamB.logo,
         };
+        const normalizedDate = formatDateDDMMYYYY(match.date);
         if (!override) {
           return {
             ...match,
+            date: normalizedDate,
             teamA: baseTeamA,
             teamB: baseTeamB,
           };
         }
         return {
           ...match,
+          date: normalizedDate,
           status: override.status,
           winner: override.winner,
           teamA: { ...baseTeamA, score: override.scoreA },
@@ -1589,67 +1592,33 @@ export default function HubSection({
                   ))}
 
                   {!showAllWithoutDatePagination && totalDatePages > 1 && (
-                    <div className="mt-5 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2.5">
-                      <p className="text-xs text-slate-400 tabular-nums">
-                        <span className="font-semibold text-slate-200">{safeDatePage}/{totalDatePages}</span>
-                        {activeDateGroup && (
-                          <>
-                            {' · '}
-                            <span className="text-cyan-300 font-medium">
-                              {activeDateGroup[0].replace(/^[^,]+,\s*/, '')}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                      <nav
-                        aria-label="Pagination jadwal per tanggal"
-                        className="flex flex-wrap items-center gap-1.5 sm:gap-1"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handlePageChange(safeDatePage - 1)}
-                          disabled={safeDatePage <= 1}
-                          aria-label="Tanggal sebelumnya"
-                          title="Tanggal sebelumnya"
-                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-
-                        {dateGroups.map(([dateLabel], idx) => {
-                          const pageNum = idx + 1;
-                          const isCurrent = pageNum === safeDatePage;
-                          return (
-                            <button
-                              key={dateLabel}
-                              type="button"
-                              onClick={() => handlePageChange(pageNum)}
-                              aria-current={isCurrent ? 'page' : undefined}
-                              aria-label={`Halaman ${pageNum}: ${dateLabel}`}
-                              title={dateLabel}
-                              className={`min-h-[44px] min-w-[40px] sm:min-h-[40px] sm:min-w-[36px] px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer tabular-nums ${
-                                isCurrent
-                                  ? 'bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-sm'
-                                  : 'bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() => handlePageChange(safeDatePage + 1)}
-                          disabled={safeDatePage >= totalDatePages}
-                          aria-label="Tanggal berikutnya"
-                          title="Tanggal berikutnya"
-                          className="min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] px-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </nav>
-                    </div>
+                    <CompactPagination
+                      currentPage={safeDatePage}
+                      totalPages={totalDatePages}
+                      onPageChange={handlePageChange}
+                      ariaLabel="Pagination jadwal per tanggal"
+                      prevAriaLabel="Tanggal sebelumnya"
+                      nextAriaLabel="Tanggal selanjutnya"
+                      getPageAriaLabel={(pageNum) => {
+                        const dateLabel = dateGroups[pageNum - 1]?.[0];
+                        return dateLabel ? `Halaman ${pageNum}: ${dateLabel}` : `Halaman ${pageNum}`;
+                      }}
+                      getPageTitle={(pageNum) => dateGroups[pageNum - 1]?.[0] || `Halaman ${pageNum}`}
+                      info={
+                        <>
+                          <span className="font-semibold text-slate-200">{safeDatePage}/{totalDatePages}</span>
+                          {activeDateGroup && (
+                            <>
+                              {' · '}
+                              <span className="text-cyan-300 font-medium">
+                                {activeDateGroup[0]}
+                              </span>
+                            </>
+                          )}
+                        </>
+                      }
+                      className="mt-5"
+                    />
                   )}
                 </div>
               )}
@@ -1983,7 +1952,7 @@ export default function HubSection({
                     {/* Fase Grup */}
                     <div className="space-y-4">
                       <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">
-                        Fase Grup (15 & 21 Nov 2026)
+                        Fase Grup (15-11-2026 &amp; 21-11-2026)
                       </div>
                       
                       <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2.5">
@@ -2031,7 +2000,7 @@ export default function HubSection({
                       </div>
 
                       <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2.5">
-                        <div className="text-[11px] font-bold text-cyan-300 uppercase">Bulu Tangkis · 21 Nov 2026 · 20.00–21.00 WIB</div>
+                        <div className="text-[11px] font-bold text-cyan-300 uppercase">Bulu Tangkis · 21-11-2026 · 20.00–21.00 WIB</div>
                         <div className="flex items-center justify-between text-xs font-semibold text-white">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded bg-white p-0.5 overflow-hidden shrink-0">

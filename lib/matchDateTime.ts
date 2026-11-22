@@ -44,6 +44,16 @@ function parseDateParts(dateStr: string): { year: number; month: number; day: nu
     }
   }
 
+  const dmyMatch = raw.match(/^(?:[a-zA-Z]+,\s*)?(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    const day = Number.parseInt(dmyMatch[1], 10);
+    const month = Number.parseInt(dmyMatch[2], 10);
+    const year = Number.parseInt(dmyMatch[3], 10);
+    if (year >= 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, day };
+    }
+  }
+
   const idMatch = raw.match(/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
   if (idMatch) {
     const day = Number.parseInt(idMatch[1], 10);
@@ -70,17 +80,16 @@ export function parseIndonesianDateToIso(dateStr: string, fallbackIso = '2026-11
   return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
+export function formatDateDDMMYYYY(dateStr: string): string {
+  const trimmed = String(dateStr || '').trim();
+  if (!trimmed) return '';
+  const parts = parseDateParts(trimmed);
+  if (!parts) return trimmed;
+  return `${String(parts.day).padStart(2, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.year).padStart(4, '0')}`;
+}
+
 export function formatIndonesianDate(isoDate: string): string {
-  if (!isoDate) return '';
-  const [year, month, day] = isoDate.split('-').map(Number);
-  if (!year || !month || !day) return isoDate;
-  const dateObj = new Date(year, month - 1, day);
-  return new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(dateObj);
+  return formatDateDDMMYYYY(isoDate);
 }
 
 export function parseMatchTimeMinutes(timeStr: string): number {

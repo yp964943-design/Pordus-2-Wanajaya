@@ -12,6 +12,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { GalleryItem } from '@/data/pordusData';
+import { formatDateDDMMYYYY } from '@/lib/matchDateTime';
 
 interface GalleryUploadFormProps {
   onAddPhotos: (items: GalleryItem[]) => Promise<boolean>;
@@ -92,19 +93,6 @@ async function compressImageToDataUrl(file: File): Promise<string> {
     compressed = drawScaled(540, 0.42);
   }
   return compressed;
-}
-
-function formatIndonesianDate(isoDate: string): string {
-  if (!isoDate) return '';
-  const [year, month, day] = isoDate.split('-').map(Number);
-  if (!year || !month || !day) return isoDate;
-  const dateObj = new Date(year, month - 1, day);
-  return new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(dateObj);
 }
 
 export default function GalleryUploadForm({
@@ -211,7 +199,7 @@ export default function GalleryUploadForm({
       return;
     }
 
-    const trimmedDate = formatIndonesianDate(dateIso) || 'Minggu, 15 November 2026';
+    const trimmedDate = formatDateDDMMYYYY(dateIso) || '15-11-2026';
     const baseTime = Date.now();
 
     const newItems: GalleryItem[] = slides.map((s, idx) => ({
@@ -467,6 +455,11 @@ export default function GalleryUploadForm({
                   className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#0a0f24] text-white border border-white/15 focus:ring-2 focus:ring-cyan-400"
                   required
                 />
+                {dateIso && (
+                  <p className="text-[11px] text-slate-400 mt-1.5 tabular-nums">
+                    Format: {formatDateDDMMYYYY(dateIso)}
+                  </p>
+                )}
               </div>
             </div>
 

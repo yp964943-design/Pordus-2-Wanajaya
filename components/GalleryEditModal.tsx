@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { AlertCircle, CheckCircle2, Pencil, X } from 'lucide-react';
 import { GalleryItem } from '@/data/pordusData';
+import { formatDateDDMMYYYY } from '@/lib/matchDateTime';
 
 interface GalleryEditModalProps {
   item: GalleryItem;
@@ -31,7 +32,7 @@ export default function GalleryEditModal({
 }: GalleryEditModalProps) {
   const [title, setTitle] = useState(item.title);
   const [category, setCategory] = useState<GalleryItem['category']>(item.category);
-  const [date, setDate] = useState(item.date);
+  const [date, setDate] = useState(formatDateDDMMYYYY(item.date));
   const [caption, setCaption] = useState(item.caption);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -63,12 +64,13 @@ export default function GalleryEditModal({
       return;
     }
 
+    const formattedDate = formatDateDDMMYYYY(trimmedDate);
     setIsSaving(true);
     try {
       const ok = await onSave({
         title: trimmedTitle.slice(0, 160),
         category,
-        date: trimmedDate.slice(0, 80),
+        date: formattedDate.slice(0, 80),
         caption: trimmedCaption.slice(0, 500),
       });
       if (!ok) {
@@ -141,7 +143,7 @@ export default function GalleryEditModal({
               {item.title}
             </p>
             <p className="text-[11px] text-slate-400 truncate mt-0.5">
-              {item.category} · {item.date}
+              {item.category} · {formatDateDDMMYYYY(item.date)}
             </p>
           </div>
         </div>
@@ -211,7 +213,7 @@ export default function GalleryEditModal({
                 value={date}
                 maxLength={80}
                 onChange={(e) => setDate(e.target.value)}
-                placeholder="Contoh: Minggu, 15 November 2026"
+                placeholder="Contoh: 15-11-2026"
                 className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#070b1a] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
                 required
               />
