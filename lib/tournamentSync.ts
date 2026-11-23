@@ -28,6 +28,8 @@ const PENDING_RESULTS_KEY = 'pordus2_pending_results_v1';
 const PENDING_RESULTS_EVENT = 'pordus-pending-results-updated';
 const PENDING_GALLERY_KEY = 'pordus2_pending_gallery_v1';
 const PENDING_GALLERY_EVENT = 'pordus-pending-gallery-updated';
+const CACHE_MATCHES_KEY = 'pordus2_cache_matches_v1';
+const CACHE_RESULTS_KEY = 'pordus2_cache_results_v1';
 
 function readStorageJson<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
@@ -252,8 +254,28 @@ export function useTournamentSync() {
         setCloudMatches(nextCustom);
         setDefaultMatchOverrides(nextOverrides);
         setCloudReady(true);
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(
+              CACHE_MATCHES_KEY,
+              JSON.stringify({ custom: nextCustom, overrides: nextOverrides })
+            );
+          }
+        } catch {
+          // ignore storage quota errors
+        }
       },
       (error) => {
+        const cached = readStorageJson<{
+          custom?: MatchItem[];
+          overrides?: Record<string, MatchItem>;
+        }>(CACHE_MATCHES_KEY, {});
+        if (Array.isArray(cached.custom) && cached.custom.length > 0) {
+          setCloudMatches(cached.custom);
+        }
+        if (cached.overrides && typeof cached.overrides === 'object') {
+          setDefaultMatchOverrides(cached.overrides);
+        }
         const errInfo = buildFirestoreErrorInfo(
           error,
           OperationType.LIST,
@@ -299,8 +321,22 @@ export function useTournamentSync() {
         });
         setCloudResults(nextMap);
         setCloudReady(true);
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(CACHE_RESULTS_KEY, JSON.stringify(nextMap));
+          }
+        } catch {
+          // ignore storage quota errors
+        }
       },
       (error) => {
+        const cached = readStorageJson<Record<string, MatchResultPayload>>(
+          CACHE_RESULTS_KEY,
+          {}
+        );
+        if (cached && typeof cached === 'object' && Object.keys(cached).length > 0) {
+          setCloudResults(cached);
+        }
         const errInfo = buildFirestoreErrorInfo(
           error,
           OperationType.LIST,

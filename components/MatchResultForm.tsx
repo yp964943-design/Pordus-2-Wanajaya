@@ -163,12 +163,22 @@ export default function MatchResultForm({
       ? startingMatch.futsalGoalScorers.map((g) => ({ ...g }))
       : []
   );
-  const [winnerMode, setWinnerMode] = useState<'auto' | 'teamA' | 'teamB' | 'draw'>(() => {
-    if (!startingMatch?.winner) return 'auto';
-    if (startingMatch.winner === startingMatch.teamA.rw) return 'teamA';
-    if (startingMatch.winner === startingMatch.teamB.rw) return 'teamB';
+  const deriveInitialWinnerMode = (
+    match?: MatchItem
+  ): 'auto' | 'teamA' | 'teamB' | 'draw' => {
+    if (!match?.winner) return 'auto';
+    const sA = match.teamA.score ?? 0;
+    const sB = match.teamB.score ?? 0;
+    const autoWinner = sA > sB ? match.teamA.rw : sB > sA ? match.teamB.rw : '';
+    if (match.winner === autoWinner) return 'auto';
+    if (match.winner === match.teamA.rw) return 'teamA';
+    if (match.winner === match.teamB.rw) return 'teamB';
     return 'auto';
-  });
+  };
+
+  const [winnerMode, setWinnerMode] = useState<'auto' | 'teamA' | 'teamB' | 'draw'>(() =>
+    deriveInitialWinnerMode(startingMatch)
+  );
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const selectedMatch = matches.find((m) => m.id === selectedMatchId) || startingMatch;
@@ -205,9 +215,7 @@ export default function MatchResultForm({
         ? nextMatch.futsalGoalScorers.map((g) => ({ ...g }))
         : []
     );
-    if (nextMatch.winner === nextMatch.teamA.rw) setWinnerMode('teamA');
-    else if (nextMatch.winner === nextMatch.teamB.rw) setWinnerMode('teamB');
-    else setWinnerMode('auto');
+    setWinnerMode(deriveInitialWinnerMode(nextMatch));
   };
 
   const handleSetScoreChange = (

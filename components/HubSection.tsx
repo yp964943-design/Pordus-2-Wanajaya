@@ -539,6 +539,11 @@ function StandingsTable({
           </tbody>
         </table>
       </div>
+      {showDraw && (
+        <p className="text-[11px] text-slate-400">
+          Keterangan: P = Main · W = Menang (3 poin) · D = Seri (1 poin) · L = Kalah (0 poin) · GA = Gol Masuk · GF = Gol Kemasukan · GD = Selisih Gol
+        </p>
+      )}
     </div>
   );
 }
@@ -1784,7 +1789,13 @@ export default function HubSection({
 
                     {/* Bola Voli Putri & Futsal Anak */}
                     {(showSport('Voli Putri') || showSport('Futsal Anak')) && (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+                      <div
+                        className={`grid grid-cols-1 gap-5 sm:gap-6 ${
+                          showSport('Voli Putri') && showSport('Futsal Anak')
+                            ? 'lg:grid-cols-2'
+                            : ''
+                        }`}
+                      >
                         {showSport('Voli Putri') && (
                           <div className="p-3.5 sm:p-5 rounded-2xl bg-white/[0.04] border border-white/10 space-y-4">
                             <div className="flex flex-wrap items-center justify-between gap-2">
