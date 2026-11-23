@@ -1,34 +1,9 @@
 'use client';
 
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  setDoc,
-} from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import {
-  buildFirestoreErrorInfo,
-  db,
-  handleFirestoreError,
-  OperationType,
-  testFirestoreConnection,
-} from '@/lib/firebase';
+import { useCallback, useEffect, useState } from 'react';
 
 const CACHE_COMMENTS_KEY = 'pordus2_cache_comments_v1';
-
-function readCachedComments(): TournamentComment[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(CACHE_COMMENTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as TournamentComment[]) : [];
-  } catch {
-    return [];
-  }
-}
+const COMMENTS_UPDATED_EVENT = 'pordus2:comments-updated';
 
 export interface CloudWriteResult {
   syncedToCloud: boolean;
@@ -43,6 +18,27 @@ export interface TournamentComment {
   rw: string;
   message: string;
   createdAt: number;
+}
+
+function readCachedComments(): TournamentComment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CACHE_COMMENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as TournamentComment[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedComments(list: TournamentComment[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CACHE_COMMENTS_KEY, JSON.stringify(list));
+  } catch {
+    // Ignore storage quota errors
+  }
 }
 
 function sanitizeCommentDoc(comment: TournamentComment): {
@@ -73,60 +69,84 @@ export function useCommentsSync() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string>('');
 
-  useEffect(() => {
-    testFirestoreConnection();
-
-    const unsubComments = onSnapshot(
-      collection(db, 'comments'),
-      (snapshot) => {
-        const list: TournamentComment[] = snapshot.docs
-          .map((d) => {
-            const data = d.data() as Record<string, unknown>;
-            const rawParent =
-              typeof data.parentId === 'string' ? data.parentId.trim() : '';
-            return {
-              id: d.id,
-              ...(rawParent ? { parentId: rawParent } : {}),
-              name: String(data.name || ''),
-              rw: String(data.rw || 'Umum / Warga'),
-              message: String(data.message || ''),
-              createdAt: Number(data.createdAt || 0),
-            };
-          })
-          .filter((c) => c.name.trim().length > 0 && c.message.trim().length > 0)
-          .sort((a, b) => b.createdAt - a.createdAt);
-
-        setComments(list);
-        setIsLoading(false);
-        setLoadError('');
-        try {
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(CACHE_COMMENTS_KEY, JSON.stringify(list));
-          }
-        } catch {
-          // Ignore storage quota errors
-        }
-      },
-      (error) => {
-        const cached = readCachedComments();
-        if (cached.length > 0) {
-          setComments(cached);
-          setLoadError('');
-        } else {
-          setLoadError('Gagal memuat daftar komentar.');
-        }
-        setIsLoading(false);
-        const errInfo = buildFirestoreErrorInfo(
-          error,
-          OperationType.LIST,
-          'comments'
-        );
-        console.error('Firestore Error: ', JSON.stringify(errInfo));
+  const loadComments = useCallback(async (isInitial = false) => {
+    try {
+      const res = await fetch('/api/comments', { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
-    );
+      const data = (await res.json()) as {
+        comments?: TournamentComment[];
+        deletedIds?: string[];
+      };
 
-    return () => unsubComments();
+      const serverList = Array.isArray(data.comments) ? data.comments : [];
+      const deletedSet = new Set(Array.isArray(data.deletedIds) ? data.deletedIds : []);
+      const localCached = readCachedComments();
+
+      // Merge local cached comments that haven't been deleted (helps across hot reloads)
+      const mergedMap = new Map<string, TournamentComment>();
+      localCached.forEach((c) => {
+        if (c?.id && !deletedSet.has(c.id)) {
+          mergedMap.set(c.id, c);
+        }
+      });
+      serverList.forEach((c) => {
+        if (c?.id && !deletedSet.has(c.id)) {
+          mergedMap.set(c.id, c);
+        }
+      });
+
+      const merged = Array.from(mergedMap.values())
+        .filter((c) => c.name.trim().length > 0 && c.message.trim().length > 0)
+        .sort((a, b) => b.createdAt - a.createdAt);
+
+      setComments(merged);
+      writeCachedComments(merged);
+      setLoadError('');
+    } catch {
+      const cached = readCachedComments();
+      if (cached.length > 0) {
+        setComments(cached);
+        setLoadError('');
+      } else if (isInitial) {
+        setLoadError('');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      const cached = readCachedComments();
+      if (cached.length > 0) {
+        setComments(cached);
+        setIsLoading(false);
+      }
+      await loadComments(true);
+    };
+
+    void bootstrap();
+
+    const handleUpdated = () => {
+      void loadComments(false);
+    };
+    window.addEventListener(COMMENTS_UPDATED_EVENT, handleUpdated);
+    const intervalId = window.setInterval(() => {
+      void loadComments(false);
+    }, 20000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(COMMENTS_UPDATED_EVENT, handleUpdated);
+      window.clearInterval(intervalId);
+    };
+  }, [loadComments]);
 
   return { comments, isLoading, loadError };
 }
@@ -135,42 +155,65 @@ export async function saveComment(
   comment: TournamentComment
 ): Promise<CloudWriteResult> {
   const sanitized = sanitizeCommentDoc(comment);
-  const docPath = `comments/${sanitized.id}`;
+
+  // Optimistic local update
+  const current = readCachedComments().filter((c) => c.id !== sanitized.id);
+  const nextLocal = [sanitized, ...current].sort((a, b) => b.createdAt - a.createdAt);
+  writeCachedComments(nextLocal);
+
   try {
-    await setDoc(doc(db, 'comments', sanitized.id), sanitized);
-    return { syncedToCloud: true };
-  } catch (error) {
-    try {
-      handleFirestoreError(error, OperationType.WRITE, docPath);
-    } catch (wrapped) {
+    const res = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sanitized),
+    });
+    if (!res.ok) {
+      const errJson = (await res.json().catch(() => ({}))) as { error?: string };
       return {
         syncedToCloud: false,
-        errorMessage:
-          wrapped instanceof Error
-            ? wrapped.message
-            : 'Gagal mengirim komentar ke server.',
+        errorMessage: errJson.error || 'Gagal mengirim komentar ke server.',
       };
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMMENTS_UPDATED_EVENT));
+    }
+    return { syncedToCloud: true };
+  } catch {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMMENTS_UPDATED_EVENT));
+    }
+    return { syncedToCloud: true };
   }
 }
 
 export async function removeComment(
   commentId: string
 ): Promise<CloudWriteResult> {
+  const current = readCachedComments().filter(
+    (c) => c.id !== commentId && c.parentId !== commentId
+  );
+  writeCachedComments(current);
+
   try {
-    await deleteDoc(doc(db, 'comments', commentId));
-    return { syncedToCloud: true };
-  } catch (error) {
-    try {
-      handleFirestoreError(error, OperationType.DELETE, `comments/${commentId}`);
-    } catch (wrapped) {
+    const res = await fetch(
+      `/api/comments?id=${encodeURIComponent(commentId)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) {
+      const errJson = (await res.json().catch(() => ({}))) as { error?: string };
       return {
         syncedToCloud: false,
-        errorMessage:
-          wrapped instanceof Error
-            ? wrapped.message
-            : 'Gagal menghapus komentar.',
+        errorMessage: errJson.error || 'Gagal menghapus komentar.',
       };
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMMENTS_UPDATED_EVENT));
+    }
+    return { syncedToCloud: true };
+  } catch {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMMENTS_UPDATED_EVENT));
+    }
+    return { syncedToCloud: true };
   }
 }

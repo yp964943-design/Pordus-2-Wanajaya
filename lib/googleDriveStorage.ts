@@ -1,7 +1,7 @@
 'use client';
 
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getLegacyFirestoreDb } from '@/lib/firebase';
 import { GalleryItem, MatchItem } from '@/data/pordusData';
 import type { MatchResultPayload } from '@/components/MatchResultForm';
 
@@ -422,6 +422,7 @@ export async function fetchLegacyFirestoreSnapshot(): Promise<{
   galleryCustomItems: DriveGalleryItem[];
   galleryDefaultOverrides: Record<string, DriveGalleryItem>;
 }> {
+  const db = getLegacyFirestoreDb();
   const [matchesSnap, resultsSnap, gallerySnap] = await Promise.all([
     getDocs(collection(db, 'custom_matches')),
     getDocs(collection(db, 'match_results')),
