@@ -13,7 +13,7 @@ interface GalleryEditModalProps {
     category: GalleryItem['category'];
     caption: string;
     date: string;
-  }) => Promise<boolean>;
+  }) => Promise<boolean | 'cancelled'>;
   onClose: () => void;
 }
 
@@ -73,8 +73,8 @@ export default function GalleryEditModal({
         date: formattedDate.slice(0, 80),
         caption: trimmedCaption.slice(0, 500),
       });
-      if (!ok) {
-        setErrorMessage('Gagal menyimpan perubahan keterangan foto ke server. Coba lagi.');
+      if (ok === false) {
+        setErrorMessage('Gagal menyimpan perubahan keterangan foto ke Google Drive. Coba lagi.');
       }
     } finally {
       setIsSaving(false);

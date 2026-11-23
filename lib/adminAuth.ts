@@ -1,7 +1,6 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { syncLocalChangesToCloud } from '@/lib/tournamentSync';
 
 const ADMIN_AUTH_STORAGE_KEY = 'pordus2_admin_session_v1';
 const ADMIN_AUTH_EVENT = 'pordus-admin-auth-updated';
@@ -58,7 +57,6 @@ export function useAdminAuth() {
   const login = (username: string, password: string): boolean => {
     if (verifyAdminCredentials(username, password)) {
       setAdminAuthenticated(true);
-      void syncLocalChangesToCloud();
       return true;
     }
     return false;

@@ -20,21 +20,14 @@ import {
   Pencil,
   X,
   LogOut,
-  Cloud,
   Users
 } from 'lucide-react';
 import { MATCHES_SCHEDULE, INITIAL_STANDINGS, RW_LOGOS, MatchItem, RWStanding } from '@/data/pordusData';
 import MatchScheduleForm from '@/components/MatchScheduleForm';
 import MatchResultForm, { MatchResultPayload } from '@/components/MatchResultForm';
 import CompactPagination from '@/components/CompactPagination';
-import {
-  removeCustomMatch,
-  removeMatchResult,
-  saveCustomMatch,
-  saveMatchResult,
-  updateMatchSchedule,
-  useTournamentSync,
-} from '@/lib/tournamentSync';
+import DriveAdminBanner from '@/components/DriveAdminBanner';
+import { useDriveSync } from '@/components/DriveSyncProvider';
 import {
   compareIndonesianDates,
   compareMatchesByDateTime,
@@ -613,7 +606,16 @@ export default function HubSection({
   const isEditFormOpen = isAdmin && adminPanel === 'edit-jadwal';
   const isResultFormOpen = isAdmin && adminPanel === 'hasil';
 
-  const { customMatches, defaultMatchOverrides, resultOverrides } = useTournamentSync();
+  const {
+    customMatches,
+    defaultMatchOverrides,
+    resultOverrides,
+    saveCustomMatchWithConfirm,
+    updateMatchScheduleWithConfirm,
+    removeCustomMatchWithConfirm,
+    saveMatchResultWithConfirm,
+    removeMatchResultWithConfirm,
+  } = useDriveSync();
 
   const allMatches = useMemo<MatchItem[]>(() => {
     const mergedDefaults = MATCHES_SCHEDULE.map(
@@ -669,7 +671,13 @@ export default function HubSection({
       onRequestAdminLogin('jadwal');
       return;
     }
-    const result = await saveCustomMatch(newMatch);
+    const result = await saveCustomMatchWithConfirm(newMatch);
+    if (result.cancelled || !result.syncedToCloud) {
+      if (!result.cancelled && result.errorMessage) {
+        setSuccessMessage(`Gagal menyimpan jadwal ke Google Drive: ${result.errorMessage}`);
+      }
+      return;
+    }
     const nextDates = Array.from(new Set([...allMatches, newMatch].map((m) => m.date))).sort(
       compareIndonesianDates
     );
@@ -682,11 +690,8 @@ export default function HubSection({
     setCurrentDatePage(targetPage);
     setActiveTab('jadwal');
     onAdminPanelChange('none');
-    const baseText = `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil ditambahkan.`;
     setSuccessMessage(
-      result.syncedToCloud
-        ? `${baseText} Tersinkronisasi ke semua device.`
-        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
+      `Jadwal ${newMatch.sport} (${newMatch.teamA.rw} vs ${newMatch.teamB.rw}) pada ${newMatch.date} pukul ${newMatch.time} berhasil disimpan ke Google Drive.`
     );
   };
 
@@ -695,7 +700,13 @@ export default function HubSection({
       onRequestAdminLogin('edit-jadwal');
       return;
     }
-    const result = await updateMatchSchedule(updatedMatch);
+    const result = await updateMatchScheduleWithConfirm(updatedMatch);
+    if (result.cancelled || !result.syncedToCloud) {
+      if (!result.cancelled && result.errorMessage) {
+        setSuccessMessage(`Gagal memperbarui jadwal di Google Drive: ${result.errorMessage}`);
+      }
+      return;
+    }
     const nextDates = Array.from(
       new Set(
         allMatches.map((m) => (m.id === updatedMatch.id ? updatedMatch.date : m.date))
@@ -705,22 +716,24 @@ export default function HubSection({
     setCurrentDatePage(targetPage);
     onAdminPanelChange('none');
     setSelectedMatchForEdit(undefined);
-    const baseText = `Jadwal ${updatedMatch.sport} (${updatedMatch.teamA.rw} vs ${updatedMatch.teamB.rw}) berhasil diperbarui ke ${updatedMatch.date} pukul ${updatedMatch.time}.`;
     setSuccessMessage(
-      result.syncedToCloud
-        ? `${baseText} Tersinkronisasi ke semua device.`
-        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
+      `Jadwal ${updatedMatch.sport} (${updatedMatch.teamA.rw} vs ${updatedMatch.teamB.rw}) berhasil diperbarui ke ${updatedMatch.date} pukul ${updatedMatch.time} di Google Drive.`
     );
   };
 
-  const handleDeleteCustomMatch = async (matchId: string) => {
+  const handleDeleteCustomMatch = async (match: MatchItem) => {
     if (!isAdmin) {
       onRequestAdminLogin('jadwal');
       return;
     }
-    const res = await removeCustomMatch(matchId);
-    if (!res.syncedToCloud) {
-      setSuccessMessage('Gagal menghapus jadwal dari server. Periksa koneksi internet Anda.');
+    const res = await removeCustomMatchWithConfirm(match);
+    if (res.cancelled) return;
+    if (res.syncedToCloud) {
+      setSuccessMessage(
+        `Jadwal ${match.sport} (${match.teamA.rw} vs ${match.teamB.rw}) berhasil dihapus dari Google Drive.`
+      );
+    } else if (res.errorMessage) {
+      setSuccessMessage(`Gagal menghapus jadwal dari Google Drive: ${res.errorMessage}`);
     }
   };
 
@@ -729,18 +742,20 @@ export default function HubSection({
       onRequestAdminLogin('hasil');
       return;
     }
-    const writeRes = await saveMatchResult(matchId, result);
     const targetMatch = allMatches.find((m) => m.id === matchId);
+    if (!targetMatch) return;
+    const writeRes = await saveMatchResultWithConfirm(targetMatch, result);
+    if (writeRes.cancelled || !writeRes.syncedToCloud) {
+      if (!writeRes.cancelled && writeRes.errorMessage) {
+        setSuccessMessage(`Gagal menyimpan hasil ke Google Drive: ${writeRes.errorMessage}`);
+      }
+      return;
+    }
     setActiveTab('hasil');
     onAdminPanelChange('none');
     setSelectedMatchForResult(undefined);
-    const baseText = targetMatch
-      ? `Hasil ${targetMatch.sport} (${targetMatch.teamA.rw} ${result.scoreA} - ${result.scoreB} ${targetMatch.teamB.rw}) berhasil disimpan.`
-      : 'Hasil pertandingan berhasil disimpan.';
     setSuccessMessage(
-      writeRes.syncedToCloud
-        ? `${baseText} Tersinkronisasi ke semua device.`
-        : `${baseText} Gagal menyinkronkan ke server — periksa koneksi internet Anda.`
+      `Hasil ${targetMatch.sport} (${targetMatch.teamA.rw} ${result.scoreA} - ${result.scoreB} ${targetMatch.teamB.rw}) berhasil disimpan ke Google Drive.`
     );
   };
 
@@ -749,14 +764,18 @@ export default function HubSection({
       onRequestAdminLogin('hasil');
       return;
     }
-    const writeRes = await removeMatchResult(matchId);
+    const targetMatch = allMatches.find((m) => m.id === matchId);
+    if (!targetMatch) return;
+    const writeRes = await removeMatchResultWithConfirm(targetMatch);
+    if (writeRes.cancelled || !writeRes.syncedToCloud) {
+      if (!writeRes.cancelled && writeRes.errorMessage) {
+        setSuccessMessage(`Gagal mereset skor di Google Drive: ${writeRes.errorMessage}`);
+      }
+      return;
+    }
     onAdminPanelChange('none');
     setSelectedMatchForResult(undefined);
-    setSuccessMessage(
-      writeRes.syncedToCloud
-        ? 'Skor pertandingan dikembalikan ke kondisi awal di semua device.'
-        : 'Gagal mereset skor di server — periksa koneksi internet Anda.'
-    );
+    setSuccessMessage('Skor pertandingan dikembalikan ke kondisi awal di Google Drive.');
   };
 
   const openResultFormForMatch = (matchId?: string) => {
@@ -1043,14 +1062,9 @@ export default function HubSection({
           {/* TAB 1 & TAB 2: JADWAL PERTANDINGAN / HASIL PERTANDINGAN */}
           {(activeTab === 'jadwal' || activeTab === 'hasil') && (
             <div>
-              {/* Admin Mode + Real-Time Sync Banner */}
+              {/* Admin Mode + Google Drive Sync Banner */}
               {isAdmin && (
-                <div className="mb-5 px-4 py-3 rounded-2xl border bg-cyan-500/10 border-cyan-400/25 text-cyan-200 flex items-start sm:items-center gap-2 text-xs">
-                  <Cloud className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5 sm:mt-0" />
-                  <span>
-                    Mode Admin Aktif — setiap input jadwal & hasil langsung tersinkronisasi real-time ke semua device.
-                  </span>
-                </div>
+                <DriveAdminBanner contextLabel="input jadwal dan hasil pertandingan" />
               )}
 
               {/* Success Feedback Banner */}
@@ -1342,7 +1356,7 @@ export default function HubSection({
                                 {isAdmin && match.isCustom && (
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteCustomMatch(match.id)}
+                                    onClick={() => handleDeleteCustomMatch(match)}
                                     aria-label={`Hapus jadwal ${match.teamA.rw} vs ${match.teamB.rw}`}
                                     title="Hapus jadwal tambahan"
                                     className="min-w-[44px] min-h-[44px] sm:min-w-[38px] sm:min-h-[38px] flex items-center justify-center rounded-lg bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-400/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer"

@@ -15,9 +15,10 @@ import SponsorSection from '@/components/SponsorSection';
 import Footer from '@/components/Footer';
 import AdminLoginModal from '@/components/AdminLoginModal';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import DriveSyncProvider from '@/components/DriveSyncProvider';
 import { useAdminAuth } from '@/lib/adminAuth';
 
-export default function HomePage() {
+function HomePageContent() {
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('jadwal');
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [pendingAdminAction, setPendingAdminAction] = useState<AdminMenuAction | null>(null);
@@ -170,5 +171,13 @@ export default function HomePage() {
         subtitle={loginModalSubtitle}
       />
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <DriveSyncProvider>
+      <HomePageContent />
+    </DriveSyncProvider>
   );
 }

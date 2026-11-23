@@ -15,7 +15,7 @@ import { GalleryItem } from '@/data/pordusData';
 import { formatDateDDMMYYYY } from '@/lib/matchDateTime';
 
 interface GalleryUploadFormProps {
-  onAddPhotos: (items: GalleryItem[]) => Promise<boolean>;
+  onAddPhotos: (items: GalleryItem[]) => Promise<boolean | 'cancelled'>;
   onClose: () => void;
 }
 
@@ -217,9 +217,9 @@ export default function GalleryUploadForm({
     setIsSaving(true);
     try {
       const saved = await onAddPhotos(newItems);
-      if (!saved) {
+      if (saved === false) {
         setErrorMessage(
-          'Gagal menyimpan foto galeri. Pastikan ukuran foto wajar atau hapus foto lama.'
+          'Gagal menyimpan foto galeri ke Google Drive. Pastikan akun Google Drive terhubung.'
         );
       }
     } finally {

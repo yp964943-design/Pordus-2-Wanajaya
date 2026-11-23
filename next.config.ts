@@ -8,14 +8,37 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Allow access to remote image placeholder.
+  // Allow access to remote image placeholder and Google Drive public proxy images.
   images: {
+    localPatterns: [
+      {
+        pathname: '/assets/**',
+      },
+      {
+        pathname: '/images/**',
+      },
+      {
+        pathname: '/api/drive-public/**',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'picsum.photos',
         port: '',
         pathname: '/**', // This allows any path under the hostname
+      },
+      {
+        protocol: 'https',
+        hostname: 'drive.google.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+        port: '',
+        pathname: '/**',
       },
     ],
   },

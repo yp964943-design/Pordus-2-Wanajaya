@@ -170,7 +170,7 @@ export default function AdminLoginModal({
         <div className="mt-5 pt-4 border-t border-white/10 flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
           <Lock className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
           <span>
-            Semua jadwal, skor pertandingan, dan foto galeri yang diinput admin otomatis tersinkronisasi dan berubah di seluruh HP/device warga.
+            Semua jadwal, skor pertandingan, dan foto galeri yang diinput admin disimpan dan disinkronkan melalui Google Drive panitia.
           </span>
         </div>
       </div>

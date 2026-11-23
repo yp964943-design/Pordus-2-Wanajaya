@@ -24,13 +24,10 @@ import { GALLERY_ITEMS, GalleryItem } from '@/data/pordusData';
 import GalleryUploadForm from '@/components/GalleryUploadForm';
 import GalleryEditModal from '@/components/GalleryEditModal';
 import CompactPagination from '@/components/CompactPagination';
+import DriveAdminBanner from '@/components/DriveAdminBanner';
+import { useDriveSync } from '@/components/DriveSyncProvider';
 import { compareIndonesianDates, formatDateDDMMYYYY } from '@/lib/matchDateTime';
-import {
-  removeGalleryItem,
-  saveGalleryItems,
-  updateGalleryItem,
-  useGallerySync,
-} from '@/lib/tournamentSync';
+import type { DriveGalleryItem } from '@/lib/googleDriveStorage';
 
 interface GalleryProps {
   isAdmin: boolean;
@@ -55,7 +52,13 @@ export default function Gallery({
   const [successMessage, setSuccessMessage] = useState<string>('');
   const touchStartXRef = useRef<number | null>(null);
 
-  const { customItems, defaultOverrides } = useGallerySync();
+  const {
+    galleryCustomItems: customItems,
+    galleryDefaultOverrides: defaultOverrides,
+    saveGalleryItemsWithConfirm,
+    updateGalleryItemWithConfirm,
+    removeGalleryItemWithConfirm,
+  } = useDriveSync();
 
   const allItems = useMemo<GalleryItem[]>(() => {
     const mergedDefaults = GALLERY_ITEMS.map(
@@ -292,14 +295,17 @@ export default function Gallery({
     }
   };
 
-  const handleAddPhotos = async (newItems: GalleryItem[]): Promise<boolean> => {
+  const handleAddPhotos = async (newItems: GalleryItem[]): Promise<boolean | 'cancelled'> => {
     if (!isAdmin) {
       onRequestAdminLogin?.();
       return false;
     }
-    const result = await saveGalleryItems(newItems);
+    const result = await saveGalleryItemsWithConfirm(newItems);
+    if (result.cancelled) {
+      return 'cancelled';
+    }
     if (!result.syncedToCloud) {
-      setSuccessMessage('Gagal mengunggah foto ke server. Periksa koneksi internet Anda dan coba lagi.');
+      setSuccessMessage('Gagal mengunggah foto ke Google Drive. Pastikan akun Google Drive terhubung.');
       return false;
     }
     setFilter('Foto Baru');
@@ -309,26 +315,28 @@ export default function Gallery({
     onToggleUpload(false);
     const label =
       newItems.length > 1
-        ? `${newItems.length} foto baru berhasil diunggah ke Galeri Slider.`
-        : `Foto "${newItems[0]?.title}" berhasil diunggah ke Galeri Slider.`;
-    setSuccessMessage(`${label} Tersinkronisasi ke semua device.`);
+        ? `${newItems.length} foto baru berhasil diunggah ke Google Drive.`
+        : `Foto "${newItems[0]?.title}" berhasil diunggah ke Google Drive.`;
+    setSuccessMessage(label);
     return true;
   };
 
-  const handleDeleteCustomPhoto = async (id: string) => {
+  const handleDeleteCustomPhoto = async (item: DriveGalleryItem) => {
     if (!isAdmin) {
       onRequestAdminLogin();
       return;
     }
-    const remainingCount = customItems.filter((item) => item.id !== id).length;
-    await removeGalleryItem(id);
-    if (activePhotoId === id) {
+    const remainingCount = customItems.filter((entry) => entry.id !== item.id).length;
+    const res = await removeGalleryItemWithConfirm(item);
+    if (res.cancelled || !res.syncedToCloud) return;
+    if (activePhotoId === item.id) {
       setActivePhotoId(null);
     }
     if (filter === 'Foto Baru' && remainingCount === 0) {
       setFilter('Semua');
     }
     setSlideIndex(0);
+    setSuccessMessage(`Foto "${item.title}" berhasil dihapus dari Google Drive.`);
   };
 
   const handleOpenEditPhoto = (item: GalleryItem) => {
@@ -344,17 +352,20 @@ export default function Gallery({
     category: GalleryItem['category'];
     caption: string;
     date: string;
-  }): Promise<boolean> => {
+  }): Promise<boolean | 'cancelled'> => {
     if (!isAdmin || !editingItem) {
       onRequestAdminLogin();
       return false;
     }
-    const result = await updateGalleryItem(editingItem, patch);
+    const result = await updateGalleryItemWithConfirm(editingItem, patch);
+    if (result.cancelled) {
+      return 'cancelled';
+    }
     if (!result.syncedToCloud) {
       return false;
     }
     setSuccessMessage(
-      `Keterangan foto "${patch.title}" berhasil diperbarui. Tersinkronisasi ke semua device.`
+      `Keterangan foto "${patch.title}" berhasil diperbarui di Google Drive.`
     );
     setEditingItem(null);
     return true;
@@ -542,6 +553,11 @@ export default function Gallery({
           </div>
         </div>
 
+        {/* Admin Google Drive Banner for Galeri */}
+        {isAdmin && (
+          <DriveAdminBanner contextLabel="upload, edit, dan hapus foto galeri" />
+        )}
+
         {/* Success Feedback Banner */}
         {successMessage && (
           <div className="mb-6 p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/35 flex items-center justify-between gap-3">
@@ -673,7 +689,7 @@ export default function Gallery({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          void handleDeleteCustomPhoto(activeSlideItem.id);
+                          void handleDeleteCustomPhoto(activeSlideItem as DriveGalleryItem);
                         }}
                         aria-label={`Hapus foto ${activeSlideItem.title}`}
                         title="Hapus foto unggahan"

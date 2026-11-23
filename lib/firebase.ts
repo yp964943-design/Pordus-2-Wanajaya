@@ -4,9 +4,13 @@ import { initializeApp, getApps } from 'firebase/app';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const firestoreDatabaseId =
+  (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId ||
+  'ai-studio-pordus2wanajayak-b759c112-c8d7-467f-9c2e-a5d34c1bb106';
+
+export const db = getFirestore(app, firestoreDatabaseId);
 
 export enum OperationType {
   CREATE = 'create',
