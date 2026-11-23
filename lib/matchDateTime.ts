@@ -85,7 +85,7 @@ export function formatDateDDMMYYYY(dateStr: string): string {
   if (!trimmed) return '';
   const parts = parseDateParts(trimmed);
   if (!parts) return trimmed;
-  return `${String(parts.day).padStart(2, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.year).padStart(4, '0')}`;
+  return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${String(parts.year).padStart(4, '0')}`;
 }
 
 export function formatIndonesianDate(isoDate: string): string {

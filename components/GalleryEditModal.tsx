@@ -213,7 +213,7 @@ export default function GalleryEditModal({
                 value={date}
                 maxLength={80}
                 onChange={(e) => setDate(e.target.value)}
-                placeholder="Contoh: 15-11-2026"
+                placeholder="Contoh: 15/11/2026"
                 className="w-full min-h-[44px] px-3.5 py-2.5 text-sm rounded-xl glass-input bg-[#070b1a] text-white border border-white/15 placeholder-slate-500 focus:ring-2 focus:ring-cyan-400"
                 required
               />

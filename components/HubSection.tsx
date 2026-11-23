@@ -1952,7 +1952,7 @@ export default function HubSection({
                     {/* Fase Grup */}
                     <div className="space-y-4">
                       <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">
-                        Fase Grup (15-11-2026 &amp; 21-11-2026)
+                        Fase Grup (15/11/2026 &amp; 21/11/2026)
                       </div>
                       
                       <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2.5">
@@ -2000,7 +2000,7 @@ export default function HubSection({
                       </div>
 
                       <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 space-y-2.5">
-                        <div className="text-[11px] font-bold text-cyan-300 uppercase">Bulu Tangkis · 21-11-2026 · 20.00–21.00 WIB</div>
+                        <div className="text-[11px] font-bold text-cyan-300 uppercase">Bulu Tangkis · 21/11/2026 · 20.00–21.00 WIB</div>
                         <div className="flex items-center justify-between text-xs font-semibold text-white">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded bg-white p-0.5 overflow-hidden shrink-0">

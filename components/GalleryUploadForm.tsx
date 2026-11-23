@@ -199,7 +199,7 @@ export default function GalleryUploadForm({
       return;
     }
 
-    const trimmedDate = formatDateDDMMYYYY(dateIso) || '15-11-2026';
+    const trimmedDate = formatDateDDMMYYYY(dateIso) || '15/11/2026';
     const baseTime = Date.now();
 
     const newItems: GalleryItem[] = slides.map((s, idx) => ({
